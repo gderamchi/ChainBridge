@@ -24,10 +24,11 @@ type HistoryItem = {
 
 const ThinkingBubble = () => (
   <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-    <div className="max-w-[85%] rounded-lg p-5 glass-panel-luxury border-gold-primary/10">
+    <div className="max-w-[85%] rounded-sm p-5 glass-panel-luxury border-gold-primary/10 relative overflow-hidden group">
+      <div className="absolute top-0 left-0 w-0.5 h-full bg-gold-primary/50"></div>
       <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
         <span className="material-symbols-outlined text-gold-primary text-sm animate-pulse">smart_toy</span>
-        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold">
+        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold font-sans">
           ChainBridge Intelligence
         </div>
       </div>
@@ -53,6 +54,9 @@ function ChatInterface() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Track the last message ID to prevent unnecessary scrolling
+  const lastMessageIdRef = useRef<string | null>(null);
 
   // Load history
   useEffect(() => {
@@ -84,14 +88,14 @@ function ChatInterface() {
     }
   }, [cId, messages]);
 
-  // Scroll to bottom
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
+  // Smart Scroll
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, loading]);
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg && lastMsg.sId !== lastMessageIdRef.current) {
+        lastMessageIdRef.current = lastMsg.sId;
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
   // Fetch conversation
   const fetchConversation = useCallback(async () => {
@@ -113,7 +117,6 @@ function ChatInterface() {
             visibility?: string;
         }
 
-        // Map to our simpler Message type and filter
         const visibleMessages: Message[] = allMessages
           .filter((m: RawMessage) => (m.type === "user_message" || m.type === "agent_message") && m.visibility !== "deleted")
           .map((m: RawMessage) => ({
@@ -123,7 +126,15 @@ function ChatInterface() {
             created: m.created
           }));
           
-        setMessages(visibleMessages);
+        // Only update state if length changed to avoid re-renders (simple check)
+        // A better check would be deep comparison, but length + last ID is usually enough for chat
+        setMessages((prev) => {
+            if (prev.length !== visibleMessages.length) return visibleMessages;
+            if (prev.length > 0 && visibleMessages.length > 0) {
+                if (prev[prev.length-1].sId !== visibleMessages[visibleMessages.length-1].sId) return visibleMessages;
+            }
+            return prev; // Return same reference to prevent effect triggering
+        });
       }
     } catch (err) {
       console.error("Error fetching conversation", err);
@@ -153,6 +164,10 @@ function ChatInterface() {
         content: userMsgContent,
         created: Date.now()
     };
+    
+    // Force scroll on user send
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    
     setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
@@ -164,7 +179,6 @@ function ChatInterface() {
       setTimeout(fetchConversation, 1000);
     } catch (err) {
       console.error("Error sending message", err);
-      // Revert optimistic update on error (simplified for now)
     } finally {
         setTimeout(() => setLoading(false), 2000); 
     }
@@ -177,15 +191,20 @@ function ChatInterface() {
     }
   };
 
-  // Determine if we should show the thinking bubble
   const lastMsg = messages[messages.length - 1];
   const showThinking = loading || (lastMsg?.type === "user_message");
 
   return (
-    <div className="flex h-screen bg-slate-dark text-white overflow-hidden font-sans">
+    <div className="flex h-screen bg-slate-dark text-white overflow-hidden font-sans relative">
+        {/* Background Effects (Landing Page Style) */}
+        <div className="absolute inset-0 bg-slate-dark z-[-2]"></div>
+        <div className="bridge-beam opacity-30"></div>
+        <div className="bridge-beam opacity-30" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
+        <div className="bridge-beam-2 opacity-20"></div>
+
         {/* Sidebar */}
         <div 
-            className={`flex-shrink-0 bg-slate-panel border-r border-white/5 transition-all duration-300 flex flex-col z-30 ${
+            className={`flex-shrink-0 bg-slate-panel/80 backdrop-blur-xl border-r border-gold-primary/10 transition-all duration-300 flex flex-col z-30 ${
                 isSidebarOpen ? "w-80" : "w-0 overflow-hidden"
             }`}
         >
@@ -202,7 +221,7 @@ function ChatInterface() {
             <div className="p-4">
                  <button 
                     onClick={() => router.push("/")}
-                    className="w-full py-3 px-4 bg-gold-primary hover:bg-white text-slate-900 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_15px_rgba(197,160,89,0.1)] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)]"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-gold-primary to-gold-dim hover:to-gold-light text-slate-900 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_15px_rgba(197,160,89,0.1)] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] hover:text-white"
                 >
                     <span className="material-symbols-outlined text-sm">add</span>
                     New Sourcing
@@ -210,65 +229,68 @@ function ChatInterface() {
             </div>
 
             <div className="flex-grow overflow-y-auto px-2 py-2">
-                <div className="px-4 pb-2 text-[10px] uppercase tracking-widest text-gray-500 font-medium">Recent Inquiries</div>
+                <div className="px-4 pb-2 text-[10px] uppercase tracking-widest text-gold-dim font-bold">History</div>
                 {history.map((item) => (
                     <Link
                         key={item.cId}
                         href={`/chat?cId=${item.cId}`}
-                        className={`group flex flex-col p-3 mb-1 rounded-sm transition-all duration-200 border-l-2 ${
+                        className={`group flex flex-col p-3 mb-1 rounded-sm transition-all duration-200 border-l-2 relative overflow-hidden ${
                             cId === item.cId 
                                 ? "bg-white/5 border-gold-primary" 
                                 : "border-transparent hover:bg-white/5 hover:border-white/20"
                         }`}
                     >
-                        <span className={`text-sm font-light truncate ${cId === item.cId ? "text-white" : "text-gray-400 group-hover:text-gray-200"}`}>
+                        <span className={`text-sm font-light truncate relative z-10 ${cId === item.cId ? "text-white" : "text-gray-400 group-hover:text-gray-200"}`}>
                             {item.title}
                         </span>
-                        <span className="text-[10px] text-gray-600 mt-1">{new Date(item.timestamp).toLocaleDateString()}</span>
+                        <span className="text-[10px] text-gray-600 mt-1 relative z-10">{new Date(item.timestamp).toLocaleDateString()}</span>
+                        {cId === item.cId && <div className="absolute inset-0 bg-gold-primary/5 z-0"></div>}
                     </Link>
                 ))}
             </div>
 
             <div className="p-4 border-t border-white/5 bg-slate-900/50">
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30 flex items-center justify-center">
-                        <span className="text-xs font-bold text-white">G</span>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30 flex items-center justify-center shadow-lg">
+                        <span className="text-xs font-serif italic text-white">G</span>
                     </div>
                     <div className="flex-grow">
-                        <div className="text-xs font-medium text-white">Guest User</div>
-                        <div className="text-[10px] text-gray-500">Enterprise Plan</div>
+                        <div className="text-xs font-medium text-white tracking-wide">Guest User</div>
+                        <div className="text-[10px] text-gold-primary/80 uppercase tracking-wider">Enterprise</div>
                     </div>
-                    <span className="material-symbols-outlined text-gray-600 text-sm">settings</span>
+                    <span className="material-symbols-outlined text-gray-600 text-sm hover:text-gold-primary cursor-pointer transition-colors">settings</span>
                 </div>
             </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-grow flex flex-col h-full relative w-full">
+        <div className="flex-grow flex flex-col h-full relative w-full z-10">
             {/* Header */}
-            <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/95 backdrop-blur z-20 shrink-0">
+            <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/80 backdrop-blur-md z-20 shrink-0">
                 <div className="flex items-center gap-4">
                     <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-400 hover:text-gold-primary transition-colors">
                         <span className="material-symbols-outlined">menu_open</span>
                     </button>
                     <div className="h-4 w-[1px] bg-white/10"></div>
-                    <span className="text-xs text-gray-400 uppercase tracking-widest">Intelligence Hub</span>
+                    <span className="text-xs text-gray-400 uppercase tracking-widest font-light">Intelligence Hub <span className="text-gold-primary/50 mx-1">/</span> Sourcing Agent</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 border border-white/5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                    <span className="text-[10px] uppercase tracking-widest text-green-500 font-medium">System Online</span>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-slate-900/50 border border-gold-primary/10 shadow-inner">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
+                    <span className="text-[10px] uppercase tracking-widest text-green-500 font-bold">Online</span>
                 </div>
             </header>
 
             {/* Chat Area */}
             <div className="flex-grow overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full">
-                 <div className="max-w-4xl mx-auto flex flex-col gap-6 pb-32">
+                 <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-32">
                     {/* Welcome State */}
                     {messages.length === 0 && !loading && (
-                        <div className="flex flex-col items-center justify-center py-20 opacity-50">
-                             <div className="w-16 h-16 rounded-full border border-gold-primary/20 flex items-center justify-center mb-6">
-                                <span className="material-symbols-outlined text-3xl text-gold-primary">manage_search</span>
+                        <div className="flex flex-col items-center justify-center py-20 opacity-60 animate-in fade-in duration-1000">
+                             <div className="w-20 h-20 rounded-full border border-gold-primary/20 flex items-center justify-center mb-8 relative">
+                                <div className="absolute inset-0 bg-gold-primary/5 rounded-full animate-ping [animation-duration:3s]"></div>
+                                <span className="material-symbols-outlined text-4xl text-gold-primary relative z-10">manage_search</span>
                              </div>
+                             <h2 className="text-2xl font-serif text-white mb-2">ChainBridge Intelligence</h2>
                              <p className="text-sm tracking-widest uppercase text-gray-500">Secure Channel Established</p>
                         </div>
                     )}
@@ -277,64 +299,70 @@ function ChatInterface() {
                     {messages.map((msg, idx) => (
                         <div
                             key={msg.sId || idx}
-                            className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-500 ${
+                            className={`flex w-full animate-in fade-in slide-in-from-bottom-4 duration-500 ${
                                 msg.type === "user_message" ? "justify-end" : "justify-start"
                             }`}
                         >
                             <div
-                                className={`max-w-[85%] rounded-lg p-5 shadow-lg relative ${
+                                className={`max-w-[85%] rounded-sm p-6 shadow-2xl relative overflow-hidden group transition-all duration-300 ${
                                     msg.type === "user_message"
-                                        ? "bg-slate-panel border border-gold-primary/20 text-white"
-                                        : "glass-panel-luxury text-gray-200 border border-gold-primary/10"
+                                        ? "bg-gradient-to-br from-slate-800 to-slate-900 border border-gold-primary/30 text-white"
+                                        : "glass-panel-luxury text-gray-200 border border-gold-primary/10 hover:border-gold-primary/20"
                                 }`}
                             >
+                                {/* Decorative line for user messages */}
+                                {msg.type === "user_message" && <div className="absolute top-0 right-0 w-0.5 h-full bg-gold-primary/30"></div>}
+                                
+                                {/* Decorative line for agent messages */}
+                                {msg.type === "agent_message" && <div className="absolute top-0 left-0 w-0.5 h-full bg-gold-primary/50"></div>}
+
                                 {msg.type === "agent_message" && (
-                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/5">
+                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/5">
                                         <span className="material-symbols-outlined text-gold-primary text-sm">smart_toy</span>
-                                        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold">
+                                        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold font-sans">
                                             ChainBridge Intelligence
                                         </div>
                                     </div>
                                 )}
                                 
-                                <div className="prose prose-invert prose-sm max-w-none break-words min-w-0">
+                                <div className="prose prose-invert prose-sm max-w-none break-words min-w-0 font-light">
                                      <ReactMarkdown 
                                         remarkPlugins={[remarkGfm]}
                                         components={{
                                             // Table styling
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             table: ({node, ...props}) => (
-                                                <div className="overflow-x-auto my-4 border border-white/10 rounded-sm">
-                                                    <table className="min-w-full text-left text-sm border-collapse bg-slate-900/50" {...props} />
+                                                <div className="overflow-x-auto my-6 border border-gold-primary/10 rounded-sm shadow-inner bg-black/20">
+                                                    <table className="min-w-full text-left text-sm border-collapse" {...props} />
                                                 </div>
                                             ),
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            thead: ({node, ...props}) => <thead className="bg-white/5 text-gold-primary uppercase text-xs tracking-wider" {...props} />,
+                                            thead: ({node, ...props}) => <thead className="bg-white/5 text-gold-primary uppercase text-[10px] tracking-widest font-bold" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            th: ({node, ...props}) => <th className="p-3 border-b border-white/10 font-medium whitespace-nowrap" {...props} />,
+                                            th: ({node, ...props}) => <th className="p-4 border-b border-white/10 font-medium whitespace-nowrap" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            td: ({node, ...props}) => <td className="p-3 border-b border-white/5 text-gray-300 min-w-[150px]" {...props} />,
+                                            td: ({node, ...props}) => <td className="p-4 border-b border-white/5 text-gray-300 min-w-[150px]" {...props} />,
                                             // Typography overrides
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             a: ({node, ...props}) => <a className="text-gold-primary hover:text-white underline decoration-gold-primary/50 underline-offset-4 transition-colors" target="_blank" rel="noopener noreferrer" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed font-light text-gray-300" {...props} />,
+                                            p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed text-gray-300" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h1: ({node, ...props}) => <h1 className="text-xl font-serif text-white mb-4 border-b border-gold-primary/20 pb-2" {...props} />,
+                                            h1: ({node, ...props}) => <h1 className="text-2xl font-serif text-white mb-6 border-b border-gold-primary/20 pb-3" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h2: ({node, ...props}) => <h2 className="text-lg font-serif text-white mt-6 mb-3" {...props} />,
+                                            h2: ({node, ...props}) => <h2 className="text-xl font-serif text-white mt-8 mb-4 flex items-center gap-2" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h3: ({node, ...props}) => <h3 className="text-base font-bold text-gold-light mt-4 mb-2 uppercase tracking-wide" {...props} />,
+                                            h3: ({node, ...props}) => <h3 className="text-sm font-bold text-gold-light mt-6 mb-2 uppercase tracking-wide border-l-2 border-gold-primary/50 pl-3" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-4 bg-white/5 py-2 pr-2 rounded-r-sm" {...props} />,
+                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-6 bg-gradient-to-r from-white/5 to-transparent py-3 pr-2 rounded-r-sm" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
                                             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            hr: ({node, ...props}) => <hr className="border-white/10 my-6" {...props} />,
+                                            hr: ({node, ...props}) => <hr className="border-gold-primary/20 my-8" {...props} />,
                                         }}
                                     >
                                         {msg.content}
@@ -352,25 +380,25 @@ function ChatInterface() {
             </div>
 
             {/* Input Area */}
-            <div className="shrink-0 w-full bg-slate-dark/95 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-40 relative">
+            <div className="shrink-0 w-full bg-slate-dark/90 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-40 relative">
                  <div className="max-w-4xl mx-auto flex gap-4 items-end">
                     <div className="relative flex-grow group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/30 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/40 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
                         <textarea
-                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[56px] shadow-lg text-sm md:text-base leading-relaxed"
+                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-4 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[60px] shadow-xl text-base leading-relaxed font-light"
                             placeholder="Type your requirements..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            disabled={loading && !showThinking} // Allow typing while "thinking" visually, but maybe block send
+                            disabled={loading && !showThinking}
                         />
                     </div>
                     <button
                         onClick={handleSend}
                         disabled={loading || !input.trim()}
-                        className="h-[56px] px-8 bg-gold-primary text-slate-900 font-bold uppercase tracking-widest hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-[0_0_15px_rgba(197,160,89,0.1)] rounded-sm hover:translate-y-[-1px] active:translate-y-[1px]"
+                        className="h-[60px] px-8 bg-gold-primary text-slate-900 font-bold uppercase tracking-widest hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-[0_0_20px_rgba(197,160,89,0.2)] rounded-sm hover:translate-y-[-1px] active:translate-y-[1px] group"
                     >
-                         <span className="material-symbols-outlined">send</span>
+                         <span className="material-symbols-outlined group-hover:scale-110 transition-transform">send</span>
                     </button>
                 </div>
             </div>
@@ -381,7 +409,7 @@ function ChatInterface() {
 
 export default function ChatPage() {
     return (
-        <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary animate-pulse">Initializing Interface...</div>}>
+        <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary animate-pulse font-serif tracking-widest">Initializing Secure Hub...</div>}>
             <ChatInterface />
         </Suspense>
     );
