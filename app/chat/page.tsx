@@ -1,26 +1,18 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Navbar from "../components/Navbar";
 
-// Define Types
+// --- Types ---
 type Message = {
   sId: string;
-  type: "user_message" | "agent_message" | "content_fragment";
+  type: "user_message" | "agent_message";
   content: string;
-  visibility: "visible" | "deleted";
   created: number;
-};
-
-type ConversationData = {
-  conversation: {
-    sId: string;
-    content: Message[][]; // Pages of messages
-  };
 };
 
 type HistoryItem = {
@@ -28,6 +20,28 @@ type HistoryItem = {
   title: string;
   timestamp: number;
 };
+
+// --- Components ---
+
+const ThinkingBubble = () => (
+  <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+    <div className="max-w-[85%] rounded-lg p-5 glass-panel-luxury border-gold-primary/10">
+      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
+        <span className="material-symbols-outlined text-gold-primary text-sm animate-pulse">smart_toy</span>
+        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold">
+          ChainBridge Intelligence
+        </div>
+      </div>
+      <div className="flex gap-1.5 items-center h-6 px-2">
+        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce"></div>
+      </div>
+    </div>
+  </div>
+);
+
+// --- Main Interface ---
 
 function ChatInterface() {
   const searchParams = useSearchParams();
@@ -41,25 +55,28 @@ function ChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Load history from localStorage
+  // Load history
   useEffect(() => {
     const saved = localStorage.getItem("chainbridge_history");
     if (saved) {
-      setHistory(JSON.parse(saved));
+      try {
+        setHistory(JSON.parse(saved));
+      } catch (e) {
+        console.error("Failed to parse history", e);
+      }
     }
   }, []);
 
-  // Save conversation to history if new
+  // Update history
   useEffect(() => {
     if (cId && messages.length > 0) {
       setHistory((prev) => {
         const exists = prev.find((h) => h.cId === cId);
         if (exists) return prev;
-
-        // Try to find a title from the first user message
+        
         const firstUserMsg = messages.find((m) => m.type === "user_message");
-        const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) + "..." : "New Inquiry";
-
+        const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? "..." : "") : "New Inquiry";
+        
         const newItem = { cId, title, timestamp: Date.now() };
         const newHistory = [newItem, ...prev];
         localStorage.setItem("chainbridge_history", JSON.stringify(newHistory));
@@ -68,7 +85,16 @@ function ChatInterface() {
     }
   }, [cId, messages]);
 
-  // Fetch conversation history
+  // Scroll to bottom
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
+
+  // Fetch conversation
   const fetchConversation = async () => {
     if (!cId) {
         setMessages([]);
@@ -77,11 +103,19 @@ function ChatInterface() {
     try {
       const res = await fetch(`/api/chat/${cId}`);
       if (res.ok) {
-        const data: ConversationData = await res.json();
+        const data = await res.json();
         const allMessages = data.conversation.content.flat();
-        const visibleMessages = allMessages.filter(
-            (m) => m.type === "user_message" || m.type === "agent_message"
-        );
+        
+        // Map to our simpler Message type and filter
+        const visibleMessages: Message[] = allMessages
+          .filter((m: any) => (m.type === "user_message" || m.type === "agent_message") && m.visibility !== "deleted")
+          .map((m: any) => ({
+            sId: m.sId,
+            type: m.type,
+            content: m.content,
+            created: m.created
+          }));
+          
         setMessages(visibleMessages);
       }
     } catch (err) {
@@ -89,6 +123,7 @@ function ChatInterface() {
     }
   };
 
+  // Initial fetch and polling
   useEffect(() => {
     fetchConversation();
     if (cId) {
@@ -97,27 +132,44 @@ function ChatInterface() {
     }
   }, [cId]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   const handleSend = async () => {
     if (!input.trim() || !cId) return;
     
-    const userMsg = input;
+    const userMsgContent = input;
     setInput("");
     setLoading(true);
+
+    // Optimistic Update
+    const optimisticMsg: Message = {
+        sId: "temp-" + Date.now(),
+        type: "user_message",
+        content: userMsgContent,
+        created: Date.now()
+    };
+    setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
       await fetch(`/api/chat/${cId}`, {
         method: "POST",
-        body: JSON.stringify({ message: userMsg }),
+        body: JSON.stringify({ message: userMsgContent }),
       });
-      await fetchConversation();
+      // Allow a brief delay for server processing before re-fetching
+      setTimeout(fetchConversation, 1000);
     } catch (err) {
       console.error("Error sending message", err);
+      // Revert optimistic update on error (simplified for now)
     } finally {
-      setLoading(false);
+        // We keep loading true for a bit if we want to show "Thinking" until the agent replies
+        // But since we poll, we can let the poller handle the "agent message arrived" state.
+        // However, to show the ThinkingBubble, we can use a timeout or check if the last message is user.
+        
+        // Better strategy: "loading" means "waiting for agent".
+        // We set loading=false only when we see a new agent message in the poller? 
+        // For simplicity, we'll set it false after the POST, but the ThinkingBubble logic can be:
+        // Show ThinkingBubble if (last message is User) AND (loading is false... wait no)
+        // Let's just use the 'loading' state for the network request + a bit of artificial delay.
+        
+        setTimeout(() => setLoading(false), 2000); 
     }
   };
 
@@ -128,167 +180,188 @@ function ChatInterface() {
     }
   };
 
-  const startNewChat = () => {
-      router.push("/");
-  };
+  // Determine if we should show the thinking bubble
+  // Logic: If loading is true OR (last message is user_message and we are waiting)
+  const lastMsg = messages[messages.length - 1];
+  const showThinking = loading || (lastMsg?.type === "user_message");
 
   return (
-    <div className="flex h-screen bg-slate-dark text-white overflow-hidden">
+    <div className="flex h-screen bg-slate-dark text-white overflow-hidden font-sans">
         {/* Sidebar */}
         <div 
-            className={`flex-shrink-0 bg-slate-panel border-r border-white/5 transition-all duration-300 flex flex-col ${
-                isSidebarOpen ? "w-72" : "w-0 overflow-hidden"
+            className={`flex-shrink-0 bg-slate-panel border-r border-white/5 transition-all duration-300 flex flex-col z-30 ${
+                isSidebarOpen ? "w-80" : "w-0 overflow-hidden"
             }`}
         >
-            <div className="p-4 border-b border-white/5 flex items-center justify-between">
-                <span className="text-xs font-serif uppercase tracking-widest text-gold-primary">History</span>
-                <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-500">
-                    <span className="material-symbols-outlined text-sm">close</span>
-                </button>
+            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                     <div className="h-6 w-6 relative flex items-center justify-center">
+                        <div className="absolute inset-0 border-t border-b border-gold-primary/40 transform -skew-x-12"></div>
+                        <div className="absolute h-[1px] w-full bg-gold-primary top-1/2 -translate-y-1/2"></div>
+                    </div>
+                    <span className="text-sm font-serif uppercase tracking-[0.2em] text-white">ChainBridge</span>
+                </div>
             </div>
+            
             <div className="p-4">
                  <button 
-                    onClick={startNewChat}
-                    className="w-full py-3 px-4 bg-gold-primary/10 hover:bg-gold-primary/20 border border-gold-primary/30 text-gold-primary text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-colors"
+                    onClick={() => router.push("/")}
+                    className="w-full py-3 px-4 bg-gold-primary hover:bg-white text-slate-900 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_15px_rgba(197,160,89,0.1)] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)]"
                 >
                     <span className="material-symbols-outlined text-sm">add</span>
                     New Sourcing
                 </button>
             </div>
-            <div className="flex-grow overflow-y-auto px-2">
+
+            <div className="flex-grow overflow-y-auto px-2 py-2">
+                <div className="px-4 pb-2 text-[10px] uppercase tracking-widest text-gray-500 font-medium">Recent Inquiries</div>
                 {history.map((item) => (
                     <Link
                         key={item.cId}
                         href={`/chat?cId=${item.cId}`}
-                        className={`block p-3 mb-1 rounded-sm text-sm transition-colors ${
+                        className={`group flex flex-col p-3 mb-1 rounded-sm transition-all duration-200 border-l-2 ${
                             cId === item.cId 
-                                ? "bg-white/5 text-white border-l-2 border-gold-primary" 
-                                : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                                ? "bg-white/5 border-gold-primary" 
+                                : "border-transparent hover:bg-white/5 hover:border-white/20"
                         }`}
                     >
-                        <div className="truncate font-light">{item.title}</div>
-                        <div className="text-[10px] text-gray-600 mt-1">{new Date(item.timestamp).toLocaleDateString()}</div>
+                        <span className={`text-sm font-light truncate ${cId === item.cId ? "text-white" : "text-gray-400 group-hover:text-gray-200"}`}>
+                            {item.title}
+                        </span>
+                        <span className="text-[10px] text-gray-600 mt-1">{new Date(item.timestamp).toLocaleDateString()}</span>
                     </Link>
                 ))}
-                {history.length === 0 && (
-                    <div className="text-center text-gray-600 text-xs mt-10 p-4">
-                        No recent inquiries.
-                    </div>
-                )}
             </div>
-             <div className="p-4 border-t border-white/5">
-                <div className="flex items-center gap-3 opacity-60 hover:opacity-100 cursor-pointer transition-opacity">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30"></div>
-                    <div>
-                        <div className="text-xs font-medium text-white">Guest User</div>
-                        <div className="text-[10px] text-gray-500">Upgrade to Pro</div>
+
+            <div className="p-4 border-t border-white/5 bg-slate-900/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30 flex items-center justify-center">
+                        <span className="text-xs font-bold text-white">G</span>
                     </div>
+                    <div className="flex-grow">
+                        <div className="text-xs font-medium text-white">Guest User</div>
+                        <div className="text-[10px] text-gray-500">Enterprise Plan</div>
+                    </div>
+                    <span className="material-symbols-outlined text-gray-600 text-sm">settings</span>
                 </div>
             </div>
         </div>
 
-        {/* Main Chat Area */}
-        <div className="flex-grow flex flex-col h-full relative">
+        {/* Main Content */}
+        <div className="flex-grow flex flex-col h-full relative w-full">
             {/* Header */}
-            <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/95 backdrop-blur z-20">
+            <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/95 backdrop-blur z-20 shrink-0">
                 <div className="flex items-center gap-4">
                     <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-400 hover:text-gold-primary transition-colors">
-                        <span className="material-symbols-outlined">menu</span>
+                        <span className="material-symbols-outlined">menu_open</span>
                     </button>
-                    <Link href="/" className="text-white font-serif tracking-widest uppercase text-sm">ChainBridge <span className="text-gold-primary">/ Intel</span></Link>
+                    <div className="h-4 w-[1px] bg-white/10"></div>
+                    <span className="text-xs text-gray-400 uppercase tracking-widest">Intelligence Hub</span>
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 border border-green-500/20">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
-                        <span className="text-[10px] uppercase tracking-widest text-green-500">Agent Active</span>
-                    </div>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/50 border border-white/5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+                    <span className="text-[10px] uppercase tracking-widest text-green-500 font-medium">System Online</span>
                 </div>
             </header>
 
-            {/* Messages */}
-            <div className="flex-grow overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth">
-                 <div className="max-w-[1000px] mx-auto flex flex-col gap-8 pb-32">
-                    {messages.length === 0 && (
-                        <div className="text-center text-gray-600 mt-20">
-                            <span className="material-symbols-outlined text-4xl mb-4 opacity-50">encrypted</span>
-                            <p className="text-sm font-light tracking-wide">Initializing secure channel with manufacturers database...</p>
+            {/* Chat Area */}
+            <div className="flex-grow overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full">
+                 <div className="max-w-4xl mx-auto flex flex-col gap-6 pb-32">
+                    {/* Welcome State */}
+                    {messages.length === 0 && !loading && (
+                        <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                             <div className="w-16 h-16 rounded-full border border-gold-primary/20 flex items-center justify-center mb-6">
+                                <span className="material-symbols-outlined text-3xl text-gold-primary">manage_search</span>
+                             </div>
+                             <p className="text-sm tracking-widest uppercase text-gray-500">Secure Channel Established</p>
                         </div>
                     )}
                     
-                    {messages.map((msg) => (
+                    {/* Messages */}
+                    {messages.map((msg, idx) => (
                         <div
-                            key={msg.sId}
-                            className={`flex w-full ${
+                            key={msg.sId || idx}
+                            className={`flex w-full animate-in fade-in slide-in-from-bottom-2 duration-500 ${
                                 msg.type === "user_message" ? "justify-end" : "justify-start"
                             }`}
                         >
                             <div
-                                className={`max-w-[95%] md:max-w-[85%] rounded-sm p-5 border ${
+                                className={`max-w-[85%] rounded-lg p-5 shadow-lg relative ${
                                     msg.type === "user_message"
-                                        ? "bg-slate-panel border-gold-primary/30 text-white"
-                                        : "glass-panel-luxury text-gray-200 border-gold-primary/10 w-full"
+                                        ? "bg-slate-panel border border-gold-primary/20 text-white"
+                                        : "glass-panel-luxury text-gray-200 border border-gold-primary/10"
                                 }`}
                             >
                                 {msg.type === "agent_message" && (
-                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/5">
+                                    <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/5">
                                         <span className="material-symbols-outlined text-gold-primary text-sm">smart_toy</span>
                                         <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold">
                                             ChainBridge Intelligence
                                         </div>
                                     </div>
                                 )}
-                                <div className={`prose prose-invert prose-p:font-light prose-p:leading-relaxed prose-headings:font-serif prose-headings:tracking-wide prose-a:text-gold-primary prose-strong:text-white prose-strong:font-medium max-w-none ${msg.type === "user_message" ? "text-right" : "text-left"}`}>
-                                    <ReactMarkdown 
+                                
+                                <div className="prose prose-invert prose-sm max-w-none break-words overflow-hidden">
+                                     <ReactMarkdown 
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            table: ({node, ...props}) => <div className="overflow-x-auto my-4"><table className="min-w-full text-left text-sm whitespace-nowrap border-collapse border border-white/10" {...props} /></div>,
+                                            // Table styling
+                                            table: ({node, ...props}) => (
+                                                <div className="overflow-x-auto my-4 border border-white/10 rounded-sm">
+                                                    <table className="min-w-full text-left text-sm border-collapse bg-slate-900/50" {...props} />
+                                                </div>
+                                            ),
                                             thead: ({node, ...props}) => <thead className="bg-white/5 text-gold-primary uppercase text-xs tracking-wider" {...props} />,
-                                            th: ({node, ...props}) => <th className="p-3 border-b border-white/10 font-medium" {...props} />,
-                                            td: ({node, ...props}) => <td className="p-3 border-b border-white/5 text-gray-300" {...props} />,
-                                            a: ({node, ...props}) => <a className="text-gold-primary hover:underline decoration-1 underline-offset-4" target="_blank" rel="noopener noreferrer" {...props} />,
-                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 my-2 space-y-1 text-gray-300" {...props} />,
-                                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 my-2 space-y-1 text-gray-300" {...props} />,
-                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-4" {...props} />,
+                                            th: ({node, ...props}) => <th className="p-3 border-b border-white/10 font-medium whitespace-nowrap" {...props} />,
+                                            td: ({node, ...props}) => <td className="p-3 border-b border-white/5 text-gray-300 min-w-[150px]" {...props} />,
+                                            // Typography overrides
+                                            a: ({node, ...props}) => <a className="text-gold-primary hover:text-white underline decoration-gold-primary/50 underline-offset-4 transition-colors" target="_blank" rel="noopener noreferrer" {...props} />,
+                                            p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed font-light text-gray-300" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
+                                            h1: ({node, ...props}) => <h1 className="text-xl font-serif text-white mb-4 border-b border-gold-primary/20 pb-2" {...props} />,
+                                            h2: ({node, ...props}) => <h2 className="text-lg font-serif text-white mt-6 mb-3" {...props} />,
+                                            h3: ({node, ...props}) => <h3 className="text-base font-bold text-gold-light mt-4 mb-2 uppercase tracking-wide" {...props} />,
+                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-4 bg-white/5 py-2 pr-2 rounded-r-sm" {...props} />,
+                                            strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
+                                            hr: ({node, ...props}) => <hr className="border-white/10 my-6" {...props} />,
                                         }}
                                     >
-                                        {msg.content || ""}
+                                        {msg.content}
                                     </ReactMarkdown>
                                 </div>
                             </div>
                         </div>
                     ))}
-                    <div ref={messagesEndRef} />
+                    
+                    {/* Typing Indicator */}
+                    {showThinking && <ThinkingBubble />}
+                    
+                    <div ref={messagesEndRef} className="h-4" />
                 </div>
             </div>
 
             {/* Input Area */}
-            <div className="absolute bottom-0 left-0 w-full bg-slate-dark/90 backdrop-blur-xl border-t border-white/5 p-4 z-40">
-                <div className="max-w-[1000px] mx-auto flex gap-4 items-end">
+            <div className="shrink-0 w-full bg-slate-dark/95 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-40 relative">
+                 <div className="max-w-4xl mx-auto flex gap-4 items-end">
                     <div className="relative flex-grow group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/20 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-500 blur-sm rounded-sm"></div>
+                        <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/30 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
                         <textarea
-                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[60px] shadow-xl"
-                            placeholder="Ask follow-up questions or refine requirements..."
+                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-3 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[56px] shadow-lg text-sm md:text-base leading-relaxed"
+                            placeholder="Type your requirements..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            disabled={loading}
+                            disabled={loading && !showThinking} // Allow typing while "thinking" visually, but maybe block send
                         />
                     </div>
                     <button
                         onClick={handleSend}
                         disabled={loading || !input.trim()}
-                        className="h-[60px] px-8 bg-gold-primary text-slate-900 font-bold uppercase tracking-widest hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-[0_0_15px_rgba(197,160,89,0.2)]"
+                        className="h-[56px] px-8 bg-gold-primary text-slate-900 font-bold uppercase tracking-widest hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-[0_0_15px_rgba(197,160,89,0.1)] rounded-sm hover:translate-y-[-1px] active:translate-y-[1px]"
                     >
-                        {loading ? (
-                             <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin"></div>
-                        ) : (
-                             <span className="material-symbols-outlined">send</span>
-                        )}
+                         <span className="material-symbols-outlined">send</span>
                     </button>
-                </div>
-                <div className="text-center mt-2">
-                     <p className="text-[10px] text-gray-600 uppercase tracking-widest">ChainBridge AI Access • Encrypted E2E</p>
                 </div>
             </div>
         </div>
@@ -298,7 +371,7 @@ function ChatInterface() {
 
 export default function ChatPage() {
     return (
-        <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary">Loading Interface...</div>}>
+        <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary animate-pulse">Initializing Interface...</div>}>
             <ChatInterface />
         </Suspense>
     );
