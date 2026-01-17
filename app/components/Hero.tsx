@@ -45,7 +45,7 @@ export default function Hero() {
   };
 
   return (
-    <section className="relative w-full flex flex-col items-center justify-center min-h-screen overflow-hidden pt-12">
+    <section className="relative w-full flex flex-col items-center justify-center min-h-screen overflow-hidden pt-32 pb-24">
       <div className="absolute inset-0 bg-slate-dark z-[-2]"></div>
       <div className="bridge-beam"></div>
       <div
@@ -70,27 +70,35 @@ export default function Hero() {
             one click.
           </p>
           <div className="w-full max-w-3xl 2xl:max-w-4xl mx-auto relative group z-30">
-            <div className="absolute -inset-1 bg-gradient-to-r from-gold-primary/30 via-gold-dim/20 to-transparent opacity-30 blur-xl transition duration-700 group-hover:opacity-60"></div>
-            <div className="relative flex flex-col md:flex-row items-center bg-slate-panel/80 backdrop-blur-xl border border-gold-primary/30 p-2 sm:p-3 shadow-2xl">
-              <div className="flex items-center w-full px-4 md:px-6">
-                <span className="material-symbols-outlined text-gold-primary font-light text-2xl">
-                  search
-                </span>
-                <input
-                  className="w-full bg-transparent border-none text-white focus:outline-0 focus:ring-0 h-16 md:h-20 px-4 text-lg md:text-xl font-light placeholder:text-gray-600 font-sans tracking-wide"
-                  placeholder="What are you sourcing today?"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  disabled={loading}
-                />
+            {/* Glow effect */}
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/50 via-gold-dim/30 to-gold-primary/10 opacity-40 blur-lg transition duration-1000 group-hover:opacity-70 group-hover:blur-xl"></div>
+            
+            {/* Main Container */}
+            <div className="relative flex items-center bg-[#0F1216] border border-white/10 p-1.5 shadow-2xl transition-all duration-300 focus-within:border-gold-primary/50 focus-within:bg-[#14181F] group-focus-within:shadow-[0_0_30px_rgba(197,160,89,0.15)]">
+              
+              {/* Icon */}
+              <div className="pl-6 pr-2 hidden md:flex items-center justify-center pointer-events-none transition-colors duration-300 group-focus-within:text-gold-primary">
+                <span className="material-symbols-outlined text-gray-500 group-focus-within:text-gold-primary text-2xl">search</span>
               </div>
+
+              {/* Input */}
+              <input
+                className="w-full bg-transparent border-none text-white focus:outline-0 focus:ring-0 h-16 text-lg font-light placeholder:text-gray-600 font-sans tracking-wide px-4"
+                placeholder="Describe your sourcing requirements..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={loading}
+              />
+
+              {/* Button */}
               <button
                 onClick={handleExecute}
                 disabled={loading}
-                className="w-full md:w-auto h-16 md:h-20 px-12 bg-gold-primary text-slate-900 hover:bg-white transition-all duration-500 text-sm md:text-base font-bold uppercase tracking-[0.2em] flex items-center justify-center whitespace-nowrap cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-16 px-8 md:px-12 bg-gold-primary hover:bg-[#D4AF67] text-slate-900 transition-all duration-300 text-xs md:text-sm font-bold uppercase tracking-[0.15em] flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ml-2 hover:shadow-[0_0_15px_rgba(197,160,89,0.3)] active:scale-[0.98]"
               >
-                {loading ? "Sourcing..." : "Execute"}
+                <span>{loading ? "Processing" : "Initialize"}</span>
+                {!loading && <span className="material-symbols-outlined text-lg">arrow_forward</span>}
               </button>
             </div>
           </div>

@@ -20,6 +20,11 @@ type HistoryItem = {
   timestamp: number;
 };
 
+// --- Utilities ---
+const cleanContent = (content: string) => {
+  return content.replace(/:cite\[[^\]]*\]/g, "").trim();
+};
+
 // --- Components ---
 
 const ThinkingBubble = () => (
@@ -53,12 +58,34 @@ function ChatInterface() {
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
-  // Track the last message ID to prevent unnecessary scrolling
-  const lastMessageIdRef = useRef<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load history
+  // Auto-resize textarea
+  const handleInputResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const target = e.target;
+    target.style.height = "auto";
+    target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
+    setInput(target.value);
+  };
+
+  const handlePromptClick = (text: string) => {
+    setInput(text);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      // minor delay to allow state update
+      setTimeout(() => {
+        textareaRef.current!.style.height = "auto";
+        textareaRef.current!.style.height = `${Math.min(textareaRef.current!.scrollHeight, 200)}px`;
+      }, 0);
+    }
+  };
+
+  // ... (rest of effects)
+
+  // Fetch conversation
   useEffect(() => {
     const saved = localStorage.getItem("chainbridge_history");
     if (saved) {
@@ -282,13 +309,31 @@ function ChatInterface() {
                  <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-32">
                     {/* Welcome State */}
                     {messages.length === 0 && !loading && (
-                        <div className="flex flex-col items-center justify-center py-20 opacity-60 animate-in fade-in duration-1000">
+                        <div className="flex flex-col items-center justify-center py-20 opacity-0 animate-in fade-in slide-in-from-bottom-4 duration-1000 fill-mode-forwards">
                              <div className="w-20 h-20 rounded-full border border-gold-primary/20 flex items-center justify-center mb-8 relative">
                                 <div className="absolute inset-0 bg-gold-primary/5 rounded-full animate-ping [animation-duration:3s]"></div>
                                 <span className="material-symbols-outlined text-4xl text-gold-primary relative z-10">manage_search</span>
                              </div>
-                             <h2 className="text-2xl font-serif text-white mb-2">ChainBridge Intelligence</h2>
-                             <p className="text-sm tracking-widest uppercase text-gray-500">Secure Channel Established</p>
+                             <h2 className="text-3xl font-serif text-white mb-3 tracking-wide">ChainBridge Intelligence</h2>
+                             <p className="text-sm tracking-[0.2em] uppercase text-gray-500 mb-12">Secure Channel Established</p>
+                             
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
+                                {[
+                                    { icon: "inventory_2", text: "Source 5,000 units of high-grade organic cotton t-shirts from Vietnam." },
+                                    { icon: "precision_manufacturing", text: "Find CNC machining suppliers for aerospace-grade aluminum parts." },
+                                    { icon: "local_shipping", text: "Compare freight logistics for container shipping from Shanghai to Hamburg." },
+                                    { icon: "verified_user", text: "Vet manufacturers for ISO 9001 compliance in the electronics sector." }
+                                ].map((prompt, i) => (
+                                    <button 
+                                        key={i}
+                                        onClick={() => handlePromptClick(prompt.text)}
+                                        className="flex items-start gap-4 p-4 text-left rounded-sm bg-white/5 border border-white/5 hover:bg-white/10 hover:border-gold-primary/30 transition-all duration-300 group"
+                                    >
+                                        <span className="material-symbols-outlined text-gold-dim group-hover:text-gold-primary transition-colors text-xl mt-0.5">{prompt.icon}</span>
+                                        <span className="text-xs text-gray-400 group-hover:text-gray-200 leading-relaxed font-light">{prompt.text}</span>
+                                    </button>
+                                ))}
+                             </div>
                         </div>
                     )}
                     
@@ -362,7 +407,7 @@ function ChatInterface() {
                                             hr: ({node, ...props}) => <hr className="border-gold-primary/20 my-8" {...props} />,
                                         }}
                                     >
-                                        {msg.content}
+                                        {cleanContent(msg.content)}
                                     </ReactMarkdown>
                                 </div>
                             </div>
@@ -382,12 +427,14 @@ function ChatInterface() {
                     <div className="relative flex-grow group">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/40 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
                         <textarea
-                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-4 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[60px] shadow-xl text-base leading-relaxed font-light"
+                            ref={textareaRef}
+                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-4 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[60px] max-h-[200px] shadow-xl text-base leading-relaxed font-light overflow-hidden"
                             placeholder="Type your requirements..."
                             value={input}
-                            onChange={(e) => setInput(e.target.value)}
+                            onChange={handleInputResize}
                             onKeyDown={handleKeyDown}
                             disabled={loading && !showThinking}
+                            rows={1}
                         />
                     </div>
                     <button
