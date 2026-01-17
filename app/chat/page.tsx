@@ -165,22 +165,21 @@ function ChatInterface() {
         created: Date.now()
     };
     
-    // Force scroll on user send
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    
+    // Add optimistic message and force scroll
     setMessages((prev) => [...prev, optimisticMsg]);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 10);
 
     try {
       await fetch(`/api/chat/${cId}`, {
         method: "POST",
         body: JSON.stringify({ message: userMsgContent }),
       });
-      // Allow a brief delay for server processing before re-fetching
-      setTimeout(fetchConversation, 1000);
+      // We rely on polling to fetch the agent response.
+      // We don't manually fetch immediately to avoid race conditions with the server indexing.
     } catch (err) {
       console.error("Error sending message", err);
     } finally {
-        setTimeout(() => setLoading(false), 2000); 
+      setLoading(false);
     }
   };
 
@@ -192,15 +191,16 @@ function ChatInterface() {
   };
 
   const lastMsg = messages[messages.length - 1];
+  // Show thinking if loading (sending) OR if the last message in our view is from the user
   const showThinking = loading || (lastMsg?.type === "user_message");
 
   return (
     <div className="flex h-screen bg-slate-dark text-white overflow-hidden font-sans relative">
         {/* Background Effects (Landing Page Style) */}
         <div className="absolute inset-0 bg-slate-dark z-[-2]"></div>
-        <div className="bridge-beam opacity-30"></div>
-        <div className="bridge-beam opacity-30" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
-        <div className="bridge-beam-2 opacity-20"></div>
+        <div className="bridge-beam opacity-30 pointer-events-none"></div>
+        <div className="bridge-beam opacity-30 pointer-events-none" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
+        <div className="bridge-beam-2 opacity-20 pointer-events-none"></div>
 
         {/* Sidebar */}
         <div 
@@ -208,7 +208,7 @@ function ChatInterface() {
                 isSidebarOpen ? "w-80" : "w-0 overflow-hidden"
             }`}
         >
-            <div className="p-6 border-b border-white/5 flex items-center justify-between">
+            <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                      <div className="h-6 w-6 relative flex items-center justify-center">
                         <div className="absolute inset-0 border-t border-b border-gold-primary/40 transform -skew-x-12"></div>
@@ -218,7 +218,7 @@ function ChatInterface() {
                 </div>
             </div>
             
-            <div className="p-4">
+            <div className="p-4 shrink-0">
                  <button 
                     onClick={() => router.push("/")}
                     className="w-full py-3 px-4 bg-gradient-to-r from-gold-primary to-gold-dim hover:to-gold-light text-slate-900 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_15px_rgba(197,160,89,0.1)] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] hover:text-white"
@@ -228,7 +228,7 @@ function ChatInterface() {
                 </button>
             </div>
 
-            <div className="flex-grow overflow-y-auto px-2 py-2">
+            <div className="flex-grow overflow-y-auto px-2 py-2 min-h-0">
                 <div className="px-4 pb-2 text-[10px] uppercase tracking-widest text-gold-dim font-bold">History</div>
                 {history.map((item) => (
                     <Link
@@ -249,7 +249,7 @@ function ChatInterface() {
                 ))}
             </div>
 
-            <div className="p-4 border-t border-white/5 bg-slate-900/50">
+            <div className="p-4 border-t border-white/5 bg-slate-900/50 shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30 flex items-center justify-center shadow-lg">
                         <span className="text-xs font-serif italic text-white">G</span>
@@ -264,7 +264,7 @@ function ChatInterface() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-grow flex flex-col h-full relative w-full z-10">
+        <div className="flex-grow flex flex-col h-full relative min-w-0 z-10">
             {/* Header */}
             <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/80 backdrop-blur-md z-20 shrink-0">
                 <div className="flex items-center gap-4">
@@ -281,7 +281,7 @@ function ChatInterface() {
             </header>
 
             {/* Chat Area */}
-            <div className="flex-grow overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full">
+            <div className="flex-grow overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth min-h-0">
                  <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-32">
                     {/* Welcome State */}
                     {messages.length === 0 && !loading && (
