@@ -36,7 +36,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${inter.variable} ${playfair.variable} antialiased font-sans selection:bg-gold-primary selection:text-slate-dark bg-slate-dark text-[#F0F2F5]`}
+        className={`${inter.variable} ${playfair.variable} antialiased font-sans selection:bg-gold-primary selection:text-slate-dark bg-slate-dark text-[#F0F2F5] overflow-x-hidden`}
       >
         <div className="relative flex min-h-screen w-full flex-col">
           {children}
