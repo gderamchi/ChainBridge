@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import Navbar from "../components/Navbar";
 
 // --- Types ---
 type Message = {
@@ -95,7 +94,7 @@ function ChatInterface() {
   }, [messages, loading]);
 
   // Fetch conversation
-  const fetchConversation = async () => {
+  const fetchConversation = useCallback(async () => {
     if (!cId) {
         setMessages([]);
         return;
@@ -106,12 +105,20 @@ function ChatInterface() {
         const data = await res.json();
         const allMessages = data.conversation.content.flat();
         
+        interface RawMessage {
+            sId: string;
+            type: string;
+            content: string;
+            created: number;
+            visibility?: string;
+        }
+
         // Map to our simpler Message type and filter
         const visibleMessages: Message[] = allMessages
-          .filter((m: any) => (m.type === "user_message" || m.type === "agent_message") && m.visibility !== "deleted")
-          .map((m: any) => ({
+          .filter((m: RawMessage) => (m.type === "user_message" || m.type === "agent_message") && m.visibility !== "deleted")
+          .map((m: RawMessage) => ({
             sId: m.sId,
-            type: m.type,
+            type: m.type as "user_message" | "agent_message",
             content: m.content,
             created: m.created
           }));
@@ -121,7 +128,7 @@ function ChatInterface() {
     } catch (err) {
       console.error("Error fetching conversation", err);
     }
-  };
+  }, [cId]);
 
   // Initial fetch and polling
   useEffect(() => {
@@ -130,7 +137,7 @@ function ChatInterface() {
       const interval = setInterval(fetchConversation, 3000);
       return () => clearInterval(interval);
     }
-  }, [cId]);
+  }, [cId, fetchConversation]);
 
   const handleSend = async () => {
     if (!input.trim() || !cId) return;
@@ -159,16 +166,6 @@ function ChatInterface() {
       console.error("Error sending message", err);
       // Revert optimistic update on error (simplified for now)
     } finally {
-        // We keep loading true for a bit if we want to show "Thinking" until the agent replies
-        // But since we poll, we can let the poller handle the "agent message arrived" state.
-        // However, to show the ThinkingBubble, we can use a timeout or check if the last message is user.
-        
-        // Better strategy: "loading" means "waiting for agent".
-        // We set loading=false only when we see a new agent message in the poller? 
-        // For simplicity, we'll set it false after the POST, but the ThinkingBubble logic can be:
-        // Show ThinkingBubble if (last message is User) AND (loading is false... wait no)
-        // Let's just use the 'loading' state for the network request + a bit of artificial delay.
-        
         setTimeout(() => setLoading(false), 2000); 
     }
   };
@@ -181,7 +178,6 @@ function ChatInterface() {
   };
 
   // Determine if we should show the thinking bubble
-  // Logic: If loading is true OR (last message is user_message and we are waiting)
   const lastMsg = messages[messages.length - 1];
   const showThinking = loading || (lastMsg?.type === "user_message");
 
@@ -301,29 +297,43 @@ function ChatInterface() {
                                     </div>
                                 )}
                                 
-                                <div className="prose prose-invert prose-sm max-w-none break-words overflow-hidden">
+                                <div className="prose prose-invert prose-sm max-w-none break-words min-w-0">
                                      <ReactMarkdown 
                                         remarkPlugins={[remarkGfm]}
                                         components={{
                                             // Table styling
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             table: ({node, ...props}) => (
                                                 <div className="overflow-x-auto my-4 border border-white/10 rounded-sm">
                                                     <table className="min-w-full text-left text-sm border-collapse bg-slate-900/50" {...props} />
                                                 </div>
                                             ),
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             thead: ({node, ...props}) => <thead className="bg-white/5 text-gold-primary uppercase text-xs tracking-wider" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             th: ({node, ...props}) => <th className="p-3 border-b border-white/10 font-medium whitespace-nowrap" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             td: ({node, ...props}) => <td className="p-3 border-b border-white/5 text-gray-300 min-w-[150px]" {...props} />,
                                             // Typography overrides
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             a: ({node, ...props}) => <a className="text-gold-primary hover:text-white underline decoration-gold-primary/50 underline-offset-4 transition-colors" target="_blank" rel="noopener noreferrer" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed font-light text-gray-300" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             h1: ({node, ...props}) => <h1 className="text-xl font-serif text-white mb-4 border-b border-gold-primary/20 pb-2" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             h2: ({node, ...props}) => <h2 className="text-lg font-serif text-white mt-6 mb-3" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             h3: ({node, ...props}) => <h3 className="text-base font-bold text-gold-light mt-4 mb-2 uppercase tracking-wide" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-4 bg-white/5 py-2 pr-2 rounded-r-sm" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
+                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
                                             hr: ({node, ...props}) => <hr className="border-white/10 my-6" {...props} />,
                                         }}
                                     >

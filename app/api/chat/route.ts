@@ -70,8 +70,15 @@ export async function POST(request: Request) {
     // We need to find the latest message from the agent.
     
     const contentPage = data.conversation.content[data.conversation.content.length - 1];
+    
+    interface DustMessage {
+      type: string;
+      agentConfigurationId?: string;
+      content: string;
+    }
+
     const agentMessage = contentPage.find(
-      (msg: any) => msg.type === "agent_message" || msg.agentConfigurationId === AGENT_ID
+      (msg: DustMessage) => msg.type === "agent_message" || msg.agentConfigurationId === AGENT_ID
     );
 
     const answer = agentMessage ? agentMessage.content : "No response from agent.";
