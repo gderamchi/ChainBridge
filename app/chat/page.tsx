@@ -127,13 +127,12 @@ function ChatInterface() {
           }));
           
         // Only update state if length changed to avoid re-renders (simple check)
-        // A better check would be deep comparison, but length + last ID is usually enough for chat
         setMessages((prev) => {
             if (prev.length !== visibleMessages.length) return visibleMessages;
             if (prev.length > 0 && visibleMessages.length > 0) {
                 if (prev[prev.length-1].sId !== visibleMessages[visibleMessages.length-1].sId) return visibleMessages;
             }
-            return prev; // Return same reference to prevent effect triggering
+            return prev;
         });
       }
     } catch (err) {
@@ -165,7 +164,6 @@ function ChatInterface() {
         created: Date.now()
     };
     
-    // Add optimistic message and force scroll
     setMessages((prev) => [...prev, optimisticMsg]);
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 10);
 
@@ -174,8 +172,6 @@ function ChatInterface() {
         method: "POST",
         body: JSON.stringify({ message: userMsgContent }),
       });
-      // We rely on polling to fetch the agent response.
-      // We don't manually fetch immediately to avoid race conditions with the server indexing.
     } catch (err) {
       console.error("Error sending message", err);
     } finally {
@@ -191,20 +187,21 @@ function ChatInterface() {
   };
 
   const lastMsg = messages[messages.length - 1];
-  // Show thinking if loading (sending) OR if the last message in our view is from the user
   const showThinking = loading || (lastMsg?.type === "user_message");
 
   return (
-    <div className="fixed inset-0 flex bg-slate-dark text-white font-sans overflow-hidden">
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-slate-dark z-[-2] pointer-events-none"></div>
-        <div className="bridge-beam opacity-30 pointer-events-none"></div>
-        <div className="bridge-beam opacity-30 pointer-events-none" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
-        <div className="bridge-beam-2 opacity-20 pointer-events-none"></div>
+    <div className="fixed inset-0 h-[100dvh] w-full flex bg-slate-dark text-white font-sans overflow-hidden overscroll-none">
+        {/* Background Effects Wrapper */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 bg-slate-dark"></div>
+            <div className="bridge-beam opacity-30"></div>
+            <div className="bridge-beam opacity-30" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
+            <div className="bridge-beam-2 opacity-20"></div>
+        </div>
 
         {/* Sidebar */}
         <aside 
-            className={`flex-shrink-0 bg-slate-panel/80 backdrop-blur-xl border-r border-gold-primary/10 transition-all duration-300 flex flex-col z-30 ${
+            className={`flex-shrink-0 bg-slate-panel/80 backdrop-blur-xl border-r border-gold-primary/10 transition-all duration-300 flex flex-col z-30 h-full ${
                 isSidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full opacity-0 overflow-hidden"
             }`}
         >
@@ -264,7 +261,7 @@ function ChatInterface() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 relative bg-transparent z-10">
+        <main className="flex-1 flex flex-col min-w-0 relative bg-transparent z-10 h-full">
             {/* Header */}
             <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/80 backdrop-blur-md z-20 shrink-0">
                 <div className="flex items-center gap-4">
@@ -281,7 +278,7 @@ function ChatInterface() {
             </header>
 
             {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full min-h-0">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full min-h-0 relative z-10">
                  <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-32">
                     {/* Welcome State */}
                     {messages.length === 0 && !loading && (
@@ -380,7 +377,7 @@ function ChatInterface() {
             </div>
 
             {/* Input Area */}
-            <div className="shrink-0 w-full bg-slate-dark/90 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-40 relative">
+            <div className="shrink-0 w-full bg-slate-dark/90 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-50 relative">
                  <div className="max-w-4xl mx-auto flex gap-4 items-end">
                     <div className="relative flex-grow group">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/40 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
