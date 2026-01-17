@@ -62,17 +62,22 @@ export async function POST(request: Request) {
     }
 
     const data = await response.json();
+    console.log("Dust API Response:", JSON.stringify(data, null, 2));
     
     // Extract the text content from the agent's message
     // The structure typically involves conversation -> content -> [array of messages]
-    // We need to find the message from the agent.
-    const agentMessage = data.conversation.content.find(
-      (msg: any) => msg.agentConfigurationId === AGENT_ID
+    // content is an array of arrays of messages (pagination)
+    // We need to find the latest message from the agent.
+    
+    const contentPage = data.conversation.content[data.conversation.content.length - 1];
+    const agentMessage = contentPage.find(
+      (msg: any) => msg.type === "agent_message" || msg.agentConfigurationId === AGENT_ID
     );
 
     const answer = agentMessage ? agentMessage.content : "No response from agent.";
+    const conversationId = data.conversation.sId;
 
-    return NextResponse.json({ answer });
+    return NextResponse.json({ answer, conversationId });
   } catch (error) {
     console.error("API Route Error:", error);
     return NextResponse.json(
