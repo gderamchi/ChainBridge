@@ -1,458 +1,221 @@
 "use client";
-import { useEffect, useState, useRef, Suspense, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
+import { useState, useRef, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 
-// --- Types ---
-type Message = {
+type ChatMessage = {
   sId: string;
   type: "user_message" | "agent_message";
   content: string;
-  created: number;
 };
 
-type HistoryItem = {
-  cId: string;
-  title: string;
-  timestamp: number;
-};
-
-// --- Utilities ---
-const cleanContent = (content: string) => {
-  return content.replace(/:cite\[[^\]]*\]/g, "").trim();
-};
-
-// --- Components ---
-
-const ThinkingBubble = () => (
-  <div className="flex w-full justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-    <div className="max-w-[85%] rounded-sm p-5 glass-panel-luxury border-gold-primary/10 relative overflow-hidden group">
-      <div className="absolute top-0 left-0 w-0.5 h-full bg-gold-primary/50"></div>
-      <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/5">
-        <span className="material-symbols-outlined text-gold-primary text-sm animate-pulse">smart_toy</span>
-        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold font-sans">
-          ChainBridge Intelligence
-        </div>
-      </div>
-      <div className="flex gap-1.5 items-center h-6 px-2">
-        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-        <div className="w-1.5 h-1.5 bg-gold-primary/60 rounded-full animate-bounce"></div>
-      </div>
-    </div>
-  </div>
-);
-
-// --- Main Interface ---
-
-function ChatInterface() {
-  const searchParams = useSearchParams();
-  const cId = searchParams.get("cId");
-  const router = useRouter();
-  
-  const [messages, setMessages] = useState<Message[]>([]);
+export default function AIChat() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [streamingContent, setStreamingContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastMessageIdRef = useRef<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-resize textarea
-  const handleInputResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const target = e.target;
-    target.style.height = "auto";
-    target.style.height = `${Math.min(target.scrollHeight, 200)}px`;
-    setInput(target.value);
-  };
-
-  const handlePromptClick = (text: string) => {
-    setInput(text);
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      // minor delay to allow state update
-      setTimeout(() => {
-        textareaRef.current!.style.height = "auto";
-        textareaRef.current!.style.height = `${Math.min(textareaRef.current!.scrollHeight, 200)}px`;
-      }, 0);
-    }
-  };
-
-  // ... (rest of effects)
-
-  // Fetch conversation
+  // Auto-scroll to bottom when messages change
   useEffect(() => {
-    const saved = localStorage.getItem("chainbridge_history");
-    if (saved) {
-      try {
-        setHistory(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse history", e);
-      }
-    }
-  }, []);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingContent]);
 
-  // Update history
-  useEffect(() => {
-    if (cId && messages.length > 0) {
-      setHistory((prev) => {
-        const exists = prev.find((h) => h.cId === cId);
-        if (exists) return prev;
-        
-        const firstUserMsg = messages.find((m) => m.type === "user_message");
-        const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) + (firstUserMsg.content.length > 30 ? "..." : "") : "New Inquiry";
-        
-        const newItem = { cId, title, timestamp: Date.now() };
-        const newHistory = [newItem, ...prev];
-        localStorage.setItem("chainbridge_history", JSON.stringify(newHistory));
-        return newHistory;
-      });
-    }
-  }, [cId, messages]);
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-  // Smart Scroll
-  useEffect(() => {
-    const lastMsg = messages[messages.length - 1];
-    if (lastMsg && lastMsg.sId !== lastMessageIdRef.current) {
-        lastMessageIdRef.current = lastMsg.sId;
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
-  // Fetch conversation
-  const fetchConversation = useCallback(async () => {
-    if (!cId) {
-        setMessages([]);
-        return;
-    }
-    try {
-      const res = await fetch(`/api/chat/${cId}`);
-      if (res.ok) {
-        const data = await res.json();
-        const allMessages = data.conversation.content.flat();
-        
-        interface RawMessage {
-            sId: string;
-            type: string;
-            content: string;
-            created: number;
-            visibility?: string;
-        }
-
-        const visibleMessages: Message[] = allMessages
-          .filter((m: RawMessage) => (m.type === "user_message" || m.type === "agent_message") && m.visibility !== "deleted")
-          .map((m: RawMessage) => ({
-            sId: m.sId,
-            type: m.type as "user_message" | "agent_message",
-            content: m.content,
-            created: m.created
-          }));
-          
-        // Only update state if length changed to avoid re-renders (simple check)
-        setMessages((prev) => {
-            if (prev.length !== visibleMessages.length) return visibleMessages;
-            if (prev.length > 0 && visibleMessages.length > 0) {
-                if (prev[prev.length-1].sId !== visibleMessages[visibleMessages.length-1].sId) return visibleMessages;
-            }
-            return prev;
-        });
-      }
-    } catch (err) {
-      console.error("Error fetching conversation", err);
-    }
-  }, [cId]);
-
-  // Initial fetch and polling
-  useEffect(() => {
-    fetchConversation();
-    if (cId) {
-      const interval = setInterval(fetchConversation, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [cId, fetchConversation]);
-
-  const handleSend = async () => {
-    if (!input.trim() || !cId) return;
-    
-    const userMsgContent = input;
-    setInput("");
-    setLoading(true);
-
-    // Optimistic Update
-    const optimisticMsg: Message = {
-        sId: "temp-" + Date.now(),
-        type: "user_message",
-        content: userMsgContent,
-        created: Date.now()
+    const userMessage: ChatMessage = {
+      sId: `temp-${Date.now()}`,
+      type: "user_message",
+      content: input.trim(),
     };
-    
-    setMessages((prev) => [...prev, optimisticMsg]);
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 10);
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setStreamingContent("");
 
     try {
-      await fetch(`/api/chat/${cId}`, {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
-        body: JSON.stringify({ message: userMsgContent }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          conversationId,
+        }),
       });
-    } catch (err) {
-      console.error("Error sending message", err);
+
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let currentContent = "";
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+
+                switch (data.type) {
+                  case "tokens":
+                    currentContent = data.fullAnswer;
+                    setStreamingContent(currentContent);
+                    break;
+                  case "done": {
+                    if (!conversationId) {
+                      setConversationId(data.conversationId);
+                    }
+                    const assistantMessage: ChatMessage = {
+                      sId: data.messageId || `msg-${Date.now()}`,
+                      type: "agent_message",
+                      content: data.content || currentContent,
+                    };
+                    setMessages((prev) => [...prev, assistantMessage]);
+                    setStreamingContent("");
+                    break;
+                  }
+                  case "error": {
+                    console.error("Stream error:", data.error);
+                    const errorMessage: ChatMessage = {
+                      sId: `error-${Date.now()}`,
+                      type: "agent_message",
+                      content: `Error: ${data.error}`,
+                    };
+                    setMessages((prev) => [...prev, errorMessage]);
+                    setStreamingContent("");
+                    break;
+                  }
+                }
+              } catch {
+                // Ignore parse errors for incomplete JSON
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error sending message:", error);
+      const errorMessage: ChatMessage = {
+        sId: `error-${Date.now()}`,
+        type: "agent_message",
+        content: "Sorry, there was an error processing your request.",
+      };
+      setMessages((prev) => [...prev, errorMessage]);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+  const handleNewChat = () => {
+    setMessages([]);
+    setConversationId(null);
+    setStreamingContent("");
   };
-
-  const lastMsg = messages[messages.length - 1];
-  const showThinking = loading || (lastMsg?.type === "user_message");
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-full flex bg-slate-dark text-white font-sans overflow-hidden overscroll-none">
-        {/* Background Effects Wrapper */}
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-            <div className="absolute inset-0 bg-slate-dark"></div>
-            <div className="bridge-beam opacity-30"></div>
-            <div className="bridge-beam opacity-30" style={{ left: "30%", transform: "rotate(25deg)" }}></div>
-            <div className="bridge-beam-2 opacity-20"></div>
-        </div>
-
-        {/* Sidebar */}
-        <aside 
-            className={`flex-shrink-0 bg-slate-panel/80 backdrop-blur-xl border-r border-gold-primary/10 transition-all duration-300 flex flex-col z-30 h-full ${
-                isSidebarOpen ? "w-80 translate-x-0" : "w-0 -translate-x-full opacity-0 overflow-hidden"
-            }`}
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex justify-between items-center p-4 border-b">
+        <h2 className="text-lg font-semibold">AI Assistant</h2>
+        <button
+          onClick={handleNewChat}
+          className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded"
         >
-            <div className="p-6 border-b border-white/5 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                     <div className="h-6 w-6 relative flex items-center justify-center">
-                        <div className="absolute inset-0 border-t border-b border-gold-primary/40 transform -skew-x-12"></div>
-                        <div className="absolute h-[1px] w-full bg-gold-primary top-1/2 -translate-y-1/2"></div>
-                    </div>
-                    <span className="text-sm font-serif uppercase tracking-[0.2em] text-white">ChainBridge</span>
-                </div>
-            </div>
-            
-            <div className="p-4 shrink-0">
-                 <button 
-                    onClick={() => router.push("/")}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-gold-primary to-gold-dim hover:to-gold-light text-slate-900 text-xs font-bold uppercase tracking-widest rounded-sm flex items-center justify-center gap-2 transition-all duration-300 shadow-[0_0_15px_rgba(197,160,89,0.1)] hover:shadow-[0_0_20px_rgba(197,160,89,0.3)] hover:text-white"
-                >
-                    <span className="material-symbols-outlined text-sm">add</span>
-                    New Sourcing
-                </button>
-            </div>
+          New Chat
+        </button>
+      </div>
 
-            <div className="flex-1 overflow-y-auto px-2 py-2 min-h-0">
-                <div className="px-4 pb-2 text-[10px] uppercase tracking-widest text-gold-dim font-bold">History</div>
-                {history.map((item) => (
-                    <Link
-                        key={item.cId}
-                        href={`/chat?cId=${item.cId}`}
-                        className={`group flex flex-col p-3 mb-1 rounded-sm transition-all duration-200 border-l-2 relative overflow-hidden ${
-                            cId === item.cId 
-                                ? "bg-white/5 border-gold-primary" 
-                                : "border-transparent hover:bg-white/5 hover:border-white/20"
-                        }`}
-                    >
-                        <span className={`text-sm font-light truncate relative z-10 ${cId === item.cId ? "text-white" : "text-gray-400 group-hover:text-gray-200"}`}>
-                            {item.title}
-                        </span>
-                        <span className="text-[10px] text-gray-600 mt-1 relative z-10">{new Date(item.timestamp).toLocaleDateString()}</span>
-                        {cId === item.cId && <div className="absolute inset-0 bg-gold-primary/5 z-0"></div>}
-                    </Link>
-                ))}
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 && !streamingContent && (
+          <div className="text-center text-gray-500 mt-8">
+            <p>Start a conversation by typing a message below.</p>
+          </div>
+        )}
+
+        {messages.map((message) => (
+          <div
+            key={message.sId}
+            className={`flex ${message.type === "user_message" ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[80%] p-3 rounded-lg ${
+                message.type === "user_message"
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-100 text-gray-900"
+              }`}
+            >
+              {message.type === "agent_message" ? (
+                <div className="prose prose-sm max-w-none">
+                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p>{message.content}</p>
+              )}
             </div>
+          </div>
+        ))}
 
-            <div className="p-4 border-t border-white/5 bg-slate-900/50 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-primary to-slate-900 border border-gold-primary/30 flex items-center justify-center shadow-lg">
-                        <span className="text-xs font-serif italic text-white">G</span>
-                    </div>
-                    <div className="flex-grow">
-                        <div className="text-xs font-medium text-white tracking-wide">Guest User</div>
-                        <div className="text-[10px] text-gold-primary/80 uppercase tracking-wider">Enterprise</div>
-                    </div>
-                    <span className="material-symbols-outlined text-gray-600 text-sm hover:text-gold-primary cursor-pointer transition-colors">settings</span>
-                </div>
+        {/* Streaming message */}
+        {streamingContent && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] p-3 rounded-lg bg-gray-100 text-gray-900">
+              <div className="prose prose-sm max-w-none">
+                <ReactMarkdown>{streamingContent}</ReactMarkdown>
+              </div>
             </div>
-        </aside>
+          </div>
+        )}
 
-        {/* Main Content */}
-        <main className="flex-1 flex flex-col min-w-0 relative bg-transparent z-10 h-full">
-            {/* Header */}
-            <header className="h-16 border-b border-white/5 flex items-center justify-between px-6 bg-slate-dark/80 backdrop-blur-md z-20 shrink-0">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-gray-400 hover:text-gold-primary transition-colors">
-                        <span className="material-symbols-outlined">menu_open</span>
-                    </button>
-                    <div className="h-4 w-[1px] bg-white/10"></div>
-                    <span className="text-xs text-gray-400 uppercase tracking-widest font-light">Intelligence Hub <span className="text-gold-primary/50 mx-1">/</span> Sourcing Agent</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm bg-slate-900/50 border border-gold-primary/10 shadow-inner">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-                    <span className="text-[10px] uppercase tracking-widest text-green-500 font-bold">Online</span>
-                </div>
-            </header>
-
-            {/* Chat Area */}
-            <div className="flex-1 overflow-y-auto px-4 sm:px-6 md:px-12 py-8 scroll-smooth w-full min-h-0 relative z-10">
-                 <div className="max-w-4xl mx-auto flex flex-col gap-8 pb-32">
-                    {/* Welcome State */}
-                    {messages.length === 0 && !loading && (
-                        <div className="flex flex-col items-center justify-center py-20 opacity-0 animate-in fade-in slide-in-from-bottom-4 duration-1000 fill-mode-forwards">
-                             <div className="w-20 h-20 rounded-full border border-gold-primary/20 flex items-center justify-center mb-8 relative">
-                                <div className="absolute inset-0 bg-gold-primary/5 rounded-full animate-ping [animation-duration:3s]"></div>
-                                <span className="material-symbols-outlined text-4xl text-gold-primary relative z-10">manage_search</span>
-                             </div>
-                             <h2 className="text-3xl font-serif text-white mb-3 tracking-wide">ChainBridge Intelligence</h2>
-                             <p className="text-sm tracking-[0.2em] uppercase text-gray-500 mb-12">Secure Channel Established</p>
-                             
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl px-4">
-                                {[
-                                    { icon: "inventory_2", text: "Source 5,000 units of high-grade organic cotton t-shirts from Vietnam." },
-                                    { icon: "precision_manufacturing", text: "Find CNC machining suppliers for aerospace-grade aluminum parts." },
-                                    { icon: "local_shipping", text: "Compare freight logistics for container shipping from Shanghai to Hamburg." },
-                                    { icon: "verified_user", text: "Vet manufacturers for ISO 9001 compliance in the electronics sector." }
-                                ].map((prompt, i) => (
-                                    <button 
-                                        key={i}
-                                        onClick={() => handlePromptClick(prompt.text)}
-                                        className="flex items-start gap-4 p-4 text-left rounded-sm bg-white/5 border border-white/5 hover:bg-white/10 hover:border-gold-primary/30 transition-all duration-300 group"
-                                    >
-                                        <span className="material-symbols-outlined text-gold-dim group-hover:text-gold-primary transition-colors text-xl mt-0.5">{prompt.icon}</span>
-                                        <span className="text-xs text-gray-400 group-hover:text-gray-200 leading-relaxed font-light">{prompt.text}</span>
-                                    </button>
-                                ))}
-                             </div>
-                        </div>
-                    )}
-                    
-                    {/* Messages */}
-                    {messages.map((msg, idx) => (
-                        <div
-                            key={msg.sId || idx}
-                            className={`flex w-full animate-in fade-in slide-in-from-bottom-4 duration-500 ${
-                                msg.type === "user_message" ? "justify-end" : "justify-start"
-                            }`}
-                        >
-                            <div
-                                className={`max-w-[85%] rounded-sm p-6 shadow-2xl relative overflow-hidden group transition-all duration-300 ${
-                                    msg.type === "user_message"
-                                        ? "bg-gradient-to-br from-slate-800 to-slate-900 border border-gold-primary/30 text-white"
-                                        : "glass-panel-luxury text-gray-200 border border-gold-primary/10 hover:border-gold-primary/20"
-                                }`}
-                            >
-                                {/* Decorative line for user messages */}
-                                {msg.type === "user_message" && <div className="absolute top-0 right-0 w-0.5 h-full bg-gold-primary/30"></div>}
-                                
-                                {/* Decorative line for agent messages */}
-                                {msg.type === "agent_message" && <div className="absolute top-0 left-0 w-0.5 h-full bg-gold-primary/50"></div>}
-
-                                {msg.type === "agent_message" && (
-                                    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/5">
-                                        <span className="material-symbols-outlined text-gold-primary text-sm">smart_toy</span>
-                                        <div className="text-[10px] text-gold-primary uppercase tracking-widest font-bold font-sans">
-                                            ChainBridge Intelligence
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <div className="prose prose-invert prose-sm max-w-none break-words min-w-0 font-light">
-                                     <ReactMarkdown 
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            // Table styling
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            table: ({node, ...props}) => (
-                                                <div className="overflow-x-auto my-6 border border-gold-primary/10 rounded-sm shadow-inner bg-black/20">
-                                                    <table className="min-w-full text-left text-sm border-collapse" {...props} />
-                                                </div>
-                                            ),
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            thead: ({node, ...props}) => <thead className="bg-white/5 text-gold-primary uppercase text-[10px] tracking-widest font-bold" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            th: ({node, ...props}) => <th className="p-4 border-b border-white/10 font-medium whitespace-nowrap" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            td: ({node, ...props}) => <td className="p-4 border-b border-white/5 text-gray-300 min-w-[150px]" {...props} />,
-                                            // Typography overrides
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            a: ({node, ...props}) => <a className="text-gold-primary hover:text-white underline decoration-gold-primary/50 underline-offset-4 transition-colors" target="_blank" rel="noopener noreferrer" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed text-gray-300" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-2 text-gray-300 marker:text-gold-primary" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h1: ({node, ...props}) => <h1 className="text-2xl font-serif text-white mb-6 border-b border-gold-primary/20 pb-3" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h2: ({node, ...props}) => <h2 className="text-xl font-serif text-white mt-8 mb-4 flex items-center gap-2" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            h3: ({node, ...props}) => <h3 className="text-sm font-bold text-gold-light mt-6 mb-2 uppercase tracking-wide border-l-2 border-gold-primary/50 pl-3" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            blockquote: ({node, ...props}) => <blockquote className="border-l-2 border-gold-primary/50 pl-4 italic text-gray-400 my-6 bg-gradient-to-r from-white/5 to-transparent py-3 pr-2 rounded-r-sm" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
-                                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                            hr: ({node, ...props}) => <hr className="border-gold-primary/20 my-8" {...props} />,
-                                        }}
-                                    >
-                                        {cleanContent(msg.content)}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    
-                    {/* Typing Indicator */}
-                    {showThinking && <ThinkingBubble />}
-                    
-                    <div ref={messagesEndRef} className="h-4" />
-                </div>
+        {/* Loading indicator */}
+        {isLoading && !streamingContent && (
+          <div className="flex justify-start">
+            <div className="max-w-[80%] p-3 rounded-lg bg-gray-100 text-gray-900">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.1s]" />
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+              </div>
             </div>
+          </div>
+        )}
 
-            {/* Input Area */}
-            <div className="shrink-0 w-full bg-slate-dark/90 backdrop-blur-xl border-t border-white/5 p-4 sm:p-6 z-50 relative">
-                 <div className="max-w-4xl mx-auto flex gap-4 items-end">
-                    <div className="relative flex-grow group">
-                        <div className="absolute -inset-0.5 bg-gradient-to-r from-gold-primary/40 to-transparent opacity-0 group-focus-within:opacity-100 transition duration-700 blur-sm rounded-sm"></div>
-                        <textarea
-                            ref={textareaRef}
-                            className="relative w-full bg-slate-panel border border-white/10 focus:border-gold-primary/50 rounded-sm px-4 py-4 text-white placeholder:text-gray-600 focus:outline-none resize-none min-h-[60px] max-h-[200px] shadow-xl text-base leading-relaxed font-light overflow-hidden"
-                            placeholder="Type your requirements..."
-                            value={input}
-                            onChange={handleInputResize}
-                            onKeyDown={handleKeyDown}
-                            disabled={loading && !showThinking}
-                            rows={1}
-                        />
-                    </div>
-                    <button
-                        onClick={handleSend}
-                        disabled={loading || !input.trim()}
-                        className="h-[60px] px-8 bg-gold-primary text-slate-900 font-bold uppercase tracking-widest hover:bg-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-[0_0_20px_rgba(197,160,89,0.2)] rounded-sm hover:translate-y-[-1px] active:translate-y-[1px] group"
-                    >
-                         <span className="material-symbols-outlined group-hover:scale-110 transition-transform">send</span>
-                    </button>
-                </div>
-            </div>
-        </main>
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type your message..."
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading}
+          />
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Send
+          </button>
+        </div>
+      </form>
     </div>
   );
-}
-export default function AIChat() {
-    return (
-        <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary animate-pulse font-serif tracking-widest">Initializing Secure Hub...</div>}>
-            <ChatInterface />
-        </Suspense>
-    );
 }

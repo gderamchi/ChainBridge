@@ -1,4 +1,17 @@
+import { DustAPI } from "@dust-tt/client";
 import { NextResponse } from "next/server";
+
+const WORKSPACE_ID = process.env.DUST_WORKSPACE_ID!;
+const API_KEY = process.env.DUST_API_KEY!;
+const AGENT_ID = process.env.DUST_AGENT_ID!;
+
+function getDustClient() {
+  return new DustAPI(
+    { url: "https://dust.tt" },
+    { workspaceId: WORKSPACE_ID, apiKey: API_KEY },
+    console
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -12,10 +25,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const WORKSPACE_ID = process.env.DUST_WORKSPACE_ID;
-    const API_KEY = process.env.DUST_API_KEY;
-    const AGENT_ID = process.env.DUST_AGENT_ID;
-
     if (!WORKSPACE_ID || !API_KEY || !AGENT_ID) {
       return NextResponse.json(
         { error: "Server configuration error" },
@@ -23,68 +32,44 @@ export async function POST(request: Request) {
       );
     }
 
-    const response = await fetch(
-      `https://dust.tt/api/v1/w/${WORKSPACE_ID}/assistant/conversations`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: {
-            content: message,
-            mentions: [
-              {
-                configurationId: AGENT_ID,
-              },
-            ],
-            context: {
-              timezone: "America/Los_Angeles",
-              username: "Guest",
-              fullName: "Guest User",
-              email: "guest@example.com",
-              profilePictureUrl: "",
-            },
-          },
-          blocking: true,
-        }),
-      }
-    );
+    const dustClient = getDustClient();
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Dust API Error:", errorData);
+    const result = await dustClient.createConversation({
+      title: message.substring(0, 50) + (message.length > 50 ? "..." : ""),
+      visibility: "unlisted",
+      message: {
+        content: message,
+        mentions: [{ configurationId: AGENT_ID }],
+        context: {
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+          username: "Guest",
+          fullName: "Guest User",
+          email: "guest@chainbridge.ai",
+          origin: "api",
+        },
+      },
+      blocking: true,
+    });
+
+    if (result.isErr()) {
+      console.error("Dust API Error:", result.error);
       return NextResponse.json(
         { error: "Failed to communicate with AI agent" },
-        { status: response.status }
+        { status: 500 }
       );
     }
 
-    const data = await response.json();
-    console.log("Dust API Response:", JSON.stringify(data, null, 2));
-    
-    // Extract the text content from the agent's message
-    // The structure typically involves conversation -> content -> [array of messages]
-    // content is an array of arrays of messages (pagination)
-    // We need to find the latest message from the agent.
-    
-    const contentPage = data.conversation.content[data.conversation.content.length - 1];
-    
-    interface DustMessage {
-      type: string;
-      agentConfigurationId?: string;
-      content: string;
-    }
+    const { conversation } = result.value;
 
+    // Find the agent message in the conversation content
+    const contentPage = conversation.content[conversation.content.length - 1];
     const agentMessage = contentPage.find(
-      (msg: DustMessage) => msg.type === "agent_message" || msg.agentConfigurationId === AGENT_ID
+      (msg) => msg.type === "agent_message"
     );
 
-    const answer = agentMessage ? agentMessage.content : "No response from agent.";
-    const conversationId = data.conversation.sId;
+    const answer = agentMessage?.content || "No response from agent.";
 
-    return NextResponse.json({ answer, conversationId });
+    return NextResponse.json({ answer, conversationId: conversation.sId });
   } catch (error) {
     console.error("API Route Error:", error);
     return NextResponse.json(
