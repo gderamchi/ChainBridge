@@ -43,7 +43,7 @@
 | 2.1 | [x] Create login page UI (`/portal/login`) | High | 3 hrs | Phase 1 |
 | 2.2 | [x] Implement magic link sign-in function | High | 1 hr | 1.4 |
 | 2.3 | [x] Create auth callback route handler (`/auth/confirm`) | High | 2 hrs | 1.4 |
-| 2.4 | Implement sign-out functionality | High | 30 min | 1.4 |
+| 2.4 | [x] Implement sign-out functionality | High | 30 min | 1.4 |
 | 2.5 | [x] Add form validation (email format) | Medium | 1 hr | 2.1 |
 | 2.6 | [x] Add loading states to login form | Medium | 1 hr | 2.1 |
 | 2.7 | [x] Add success/error message display | Medium | 1 hr | 2.1, 2.2 |
@@ -52,7 +52,7 @@
 - [x] Login page with email input
 - [x] Magic link sending functionality
 - [x] Auth callback handler
-- [ ] Sign-out button/action
+- [x] Sign-out button/action
 - [x] Form validation
 - [x] Loading and error states
 
