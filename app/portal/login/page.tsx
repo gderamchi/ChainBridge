@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -150,5 +150,30 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function LoginFormFallback() {
+  return (
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-dark relative overflow-hidden p-6">
+      <div className="absolute inset-0 bg-slate-dark z-0"></div>
+      <div className="bridge-beam"></div>
+      <div className="bridge-beam-2 opacity-50"></div>
+      <div className="glass-panel-luxury w-full max-w-md p-8 md:p-10 rounded-sm relative z-10 flex flex-col items-center border-t border-gold-primary/20 animate-pulse">
+        <div className="h-8 w-32 bg-white/10 rounded mb-8"></div>
+        <div className="h-8 w-48 bg-white/10 rounded mb-2"></div>
+        <div className="h-4 w-40 bg-white/10 rounded mb-8"></div>
+        <div className="w-full h-12 bg-white/10 rounded mb-4"></div>
+        <div className="w-full h-12 bg-white/10 rounded"></div>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFormFallback />}>
+      <LoginForm />
+    </Suspense>
   );
 }
