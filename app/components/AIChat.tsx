@@ -63,51 +63,52 @@ export default function AIChat() {
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+          console.log("!chunk", chunk);
+          // buffer += chunk;
+          // const lines = buffer.split("\n");
+          // buffer = lines.pop() || "";
 
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (trimmedLine.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(trimmedLine.slice(6));
+          // for (const line of lines) {
+          //   const trimmedLine = line.trim();
+          //   if (trimmedLine.startsWith("data: ")) {
+          //     try {
+          //       const data = JSON.parse(trimmedLine.slice(6));
 
-                switch (data.type) {
-                  case "tokens":
-                    currentContent += data.content;
-                    setStreamingContent(currentContent);
-                    break;
-                  case "done": {
-                    if (!conversationId) {
-                      setConversationId(data.conversationId);
-                    }
-                    const assistantMessage: ChatMessage = {
-                      sId: data.messageId || `msg-${Date.now()}`,
-                      type: "agent_message",
-                      content: data.content || currentContent,
-                    };
-                    setMessages((prev) => [...prev, assistantMessage]);
-                    setStreamingContent("");
-                    break;
-                  }
-                  case "error": {
-                    console.error("Stream error:", data.error);
-                    const errorMessage: ChatMessage = {
-                      sId: `error-${Date.now()}`,
-                      type: "agent_message",
-                      content: `Error: ${data.error}`,
-                    };
-                    setMessages((prev) => [...prev, errorMessage]);
-                    setStreamingContent("");
-                    break;
-                  }
-                }
-              } catch {
-                // Ignore parse errors for incomplete JSON
-              }
-            }
-          }
+          //       switch (data.type) {
+          //         case "tokens":
+          //           currentContent += data.content;
+          //           setStreamingContent(currentContent);
+          //           break;
+          //         case "done": {
+          //           if (!conversationId) {
+          //             setConversationId(data.conversationId);
+          //           }
+          //           const assistantMessage: ChatMessage = {
+          //             sId: data.messageId || `msg-${Date.now()}`,
+          //             type: "agent_message",
+          //             content: data.content || currentContent,
+          //           };
+          //           setMessages((prev) => [...prev, assistantMessage]);
+          //           setStreamingContent("");
+          //           break;
+          //         }
+          //         case "error": {
+          //           console.error("Stream error:", data.error);
+          //           const errorMessage: ChatMessage = {
+          //             sId: `error-${Date.now()}`,
+          //             type: "agent_message",
+          //             content: `Error: ${data.error}`,
+          //           };
+          //           setMessages((prev) => [...prev, errorMessage]);
+          //           setStreamingContent("");
+          //           break;
+          //         }
+          //       }
+          //     } catch {
+          //       // Ignore parse errors for incomplete JSON
+          //     }
+          //   }
+          // }
         }
       }
     } catch (error) {
