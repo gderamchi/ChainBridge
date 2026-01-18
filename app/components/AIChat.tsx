@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState, useRef, Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -450,8 +449,7 @@ function ChatInterface() {
     </div>
   );
 }
-
-export default function ChatPage() {
+export default function AIChat() {
     return (
         <Suspense fallback={<div className="bg-slate-dark h-screen flex items-center justify-center text-gold-primary animate-pulse font-serif tracking-widest">Initializing Secure Hub...</div>}>
             <ChatInterface />
