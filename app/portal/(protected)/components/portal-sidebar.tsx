@@ -1,6 +1,6 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, BrainCircuit, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -22,6 +22,11 @@ const navItems = [
     title: "Search",
     url: "/portal/search",
     icon: Search,
+  },
+  {
+    title: "Intelligence",
+    url: "/portal/intelligence",
+    icon: Sparkles,
   },
 ];
 
