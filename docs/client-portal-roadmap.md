@@ -82,175 +82,22 @@
 
 ## Phase 4: Portal Dashboard (Placeholder)
 **Duration**: 1 day  
-**Status**: 🔲 Not Started
+**Status**: ✅ Completed
 
 ### Tasks
 
 | # | Task | Priority | Est. Time | Dependencies |
 |---|------|----------|-----------|--------------|
-| 4.1 | Create portal layout component | High | 1 hr | Phase 3 |
-| 4.2 | Create placeholder dashboard page (`/portal`) | High | 2 hrs | 4.1 |
-| 4.3 | Display authenticated user info | Medium | 30 min | 4.2 |
-| 4.4 | Add sign-out button to portal | High | 30 min | 2.4, 4.2 |
-| 4.5 | Add portal navigation link to Navbar | Medium | 30 min | 4.2 |
-| 4.6 | Style portal consistent with main site | High | 1 hr | 4.2 |
+| 4.1 | [x] Create portal layout component | High | 1 hr | Phase 3 |
+| 4.2 | [x] Create placeholder dashboard page (`/portal`) | High | 2 hrs | 4.1 |
+| 4.3 | [x] Display authenticated user info | Medium | 30 min | 4.2 |
+| 4.4 | [x] Add sign-out button to portal | High | 30 min | 2.4, 4.2 |
+| 4.5 | [x] Add portal navigation link to Navbar | Medium | 30 min | 4.2 |
+| 4.6 | [x] Style portal consistent with main site | High | 1 hr | 4.2 |
 
 ### Deliverables
-- [ ] Portal layout
-- [ ] Placeholder dashboard
-- [ ] User info display
-- [ ] Sign-out functionality
-- [ ] Navigation integration
-
----
-
-## Phase 5: Testing & Polish
-**Duration**: 1-2 days  
-**Status**: 🔲 Not Started
-
-### Tasks
-
-| # | Task | Priority | Est. Time | Dependencies |
-|---|------|----------|-----------|--------------|
-| 5.1 | Test complete auth flow (new user) | High | 1 hr | Phase 4 |
-| 5.2 | Test complete auth flow (existing user) | High | 1 hr | Phase 4 |
-| 5.3 | Test expired magic link handling | Medium | 30 min | Phase 4 |
-| 5.4 | Test mobile responsiveness | High | 1 hr | Phase 4 |
-| 5.5 | Test error scenarios | Medium | 1 hr | Phase 4 |
-| 5.6 | Cross-browser testing | Medium | 1 hr | Phase 4 |
-| 5.7 | Accessibility review | Medium | 1 hr | Phase 4 |
-| 5.8 | Performance review | Low | 30 min | Phase 4 |
-
-### Deliverables
-- [ ] All test cases passed
-- [ ] Mobile responsive verified
-- [ ] Cross-browser compatible
-- [ ] Accessible (basic a11y)
-
----
-
-## Phase 6: Documentation & Deployment
-**Duration**: 0.5 days  
-**Status**: 🔲 Not Started
-
-### Tasks
-
-| # | Task | Priority | Est. Time | Dependencies |
-|---|------|----------|-----------|--------------|
-| 6.1 | Update README with portal documentation | Medium | 30 min | Phase 5 |
-| 6.2 | Document environment variables needed | High | 15 min | Phase 5 |
-| 6.3 | Configure production Supabase settings | High | 30 min | Phase 5 |
-| 6.4 | Deploy to staging | High | 30 min | 6.3 |
-| 6.5 | Final QA on staging | High | 1 hr | 6.4 |
-| 6.6 | Deploy to production | High | 30 min | 6.5 |
-
-### Deliverables
-- [ ] Documentation updated
-- [ ] Staging deployment
-- [ ] Production deployment
-
----
-
-## Timeline Summary
-
-```
-Week 1
-├── Day 1-2: Phase 1 (Foundation & Setup)
-├── Day 3-5: Phase 2 (Authentication Implementation)
-│
-Week 2
-├── Day 1: Phase 3 (Route Protection)
-├── Day 2: Phase 4 (Portal Dashboard Placeholder)
-├── Day 3-4: Phase 5 (Testing & Polish)
-├── Day 5: Phase 6 (Documentation & Deployment)
-```
-
-**Total Estimated Time**: 6-9 business days
-
----
-
-## File Structure (To Be Created)
-
-```
-app/
-├── auth/
-│   └── confirm/
-│       └── route.ts          # Magic link callback handler
-├── portal/
-│   ├── layout.tsx            # Portal layout with auth check
-│   ├── page.tsx              # Portal dashboard (placeholder)
-│   └── login/
-│       └── page.tsx          # Magic link login page
-lib/
-└── supabase/
-    ├── client.ts             # Browser Supabase client
-    └── server.ts             # Server Supabase client
-middleware.ts                  # Route protection middleware
-```
-
----
-
-## Risk Assessment
-
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| Supabase email deliverability issues | Medium | High | Test with multiple email providers, monitor Supabase logs |
-| Magic link spam/abuse | Low | Medium | Rate limiting configured by default (60s) |
-| Session token issues | Low | High | Use official Supabase SSR package |
-| Mobile email client link issues | Medium | Medium | Test across popular email clients |
-
----
-
-## Success Metrics
-
-| Metric | Target |
-|--------|--------|
-| Login flow completion rate | > 90% |
-| Magic link delivery time | < 30 seconds |
-| Auth callback success rate | > 99% |
-| Mobile usability score | > 80% |
-
----
-
-## Future Phases (Out of Current Scope)
-
-### Phase 7: Enhanced Authentication
-- Social OAuth (Google, LinkedIn)
-- Email OTP alternative
-- Remember device functionality
-
-### Phase 8: User Profile
-- Profile editing
-- Email change flow
-- Account deletion
-
-### Phase 9: Client Portal Features
-- Sourcing dashboard
-- Order history
-- Document management
-- Communication center
-- Analytics & reporting
-
-### Phase 10: Admin Features
-- User management
-- Role-based access
-- Audit logging
-- Client onboarding workflow
-
----
-
-## Change Log
-
-| Date | Version | Changes | Author |
-|------|---------|---------|--------|
-| Jan 18, 2026 | 1.0 | Initial roadmap created | - |
-
----
-
-## Notes
-
-- All dates are estimates and subject to change based on team availability
-- Phases 1-6 represent the MVP with magic link auth only
-- Portal dashboard is intentionally a placeholder for this phase
-- `shouldCreateUser` is set to `true` to allow new client sign-ups
-- Styling must remain consistent with existing ChainBridge design system (slate/gold theme)
+- [x] Portal layout
+- [x] Placeholder dashboard
+- [x] User info display
+- [x] Sign-out functionality
+- [x] Navigation integration
