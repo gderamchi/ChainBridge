@@ -21,6 +21,7 @@
 | 1.3 | [x] Set up environment variables | High | 15 min | 1.1 |
 | 1.4 | [x] Create Supabase client utilities (`lib/supabase/client.ts`, `lib/supabase/server.ts`) | High | 1 hr | 1.2, 1.3 |
 | 1.5 | Configure redirect URLs in Supabase dashboard | High | 15 min | 1.1 |
+| 1.6 | Configure Email Template in Supabase dashboard | High | 15 min | 1.1 |
 
 ### Deliverables
 - [x] Supabase project created
@@ -33,28 +34,27 @@
 
 ## Phase 2: Authentication Implementation
 **Duration**: 2-3 days  
-**Status**: 🔲 Not Started
+**Status**: � In Progress
 
 ### Tasks
 
 | # | Task | Priority | Est. Time | Dependencies |
 |---|------|----------|-----------|--------------|
-| 2.1 | Create login page UI (`/portal/login`) | High | 3 hrs | Phase 1 |
-| 2.2 | Implement magic link sign-in function | High | 1 hr | 1.4 |
-| 2.3 | Create auth callback route handler (`/auth/confirm`) | High | 2 hrs | 1.4 |
+| 2.1 | [x] Create login page UI (`/portal/login`) | High | 3 hrs | Phase 1 |
+| 2.2 | [x] Implement magic link sign-in function | High | 1 hr | 1.4 |
+| 2.3 | [x] Create auth callback route handler (`/auth/confirm`) | High | 2 hrs | 1.4 |
 | 2.4 | Implement sign-out functionality | High | 30 min | 1.4 |
-| 2.5 | Add form validation (email format) | Medium | 1 hr | 2.1 |
-| 2.6 | Add loading states to login form | Medium | 1 hr | 2.1 |
-| 2.7 | Add success/error message display | Medium | 1 hr | 2.1, 2.2 |
-| 2.8 | Handle rate limiting errors | Medium | 30 min | 2.2 |
-
+| 2.5 | [x] Add form validation (email format) | Medium | 1 hr | 2.1 |
+| 2.6 | [x] Add loading states to login form | Medium | 1 hr | 2.1 |
+| 2.7 | [x] Add success/error message display | Medium | 1 hr | 2.1, 2.2 |
+| 2.8 | [x] Handle rate limiting errors | Medium | 30 min | 2.2 || 2.9 | Connect Navbar "Client Portal" button | High | 15 min | 2.1 |
 ### Deliverables
-- [ ] Login page with email input
-- [ ] Magic link sending functionality
-- [ ] Auth callback handler
+- [x] Login page with email input
+- [x] Magic link sending functionality
+- [x] Auth callback handler
 - [ ] Sign-out button/action
-- [ ] Form validation
-- [ ] Loading and error states
+- [x] Form validation
+- [x] Loading and error states
 
 ---
 

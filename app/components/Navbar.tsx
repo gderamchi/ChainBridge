@@ -34,9 +34,12 @@ export default function Navbar() {
               Access
             </Link>
           </div>
-          <button className="hidden md:flex items-center gap-2 text-gold-primary hover:text-white transition-colors text-xs font-bold uppercase tracking-widest border border-gold-primary/30 px-6 py-2 hover:bg-gold-primary/10 rounded-sm cursor-pointer">
+          <Link 
+            href="/portal"
+            className="hidden md:flex items-center gap-2 text-gold-primary hover:text-white transition-colors text-xs font-bold uppercase tracking-widest border border-gold-primary/30 px-6 py-2 hover:bg-gold-primary/10 rounded-sm cursor-pointer"
+          >
             Client Portal
-          </button>
+          </Link>
           <button className="md:hidden text-gold-primary cursor-pointer">
             <span className="material-symbols-outlined">menu</span>
           </button>

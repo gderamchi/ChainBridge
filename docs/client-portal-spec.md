@@ -41,7 +41,23 @@ The Client Portal is a secure, authenticated area of ChainBridge where verified 
 | OTP Expiry | 60 minutes (default) | Magic link validity period |
 | Rate Limit | 1 request/60 seconds | Prevent spam/abuse |
 
-### 1.4 User Flow
+### 1.4 Email Template (Supabase)
+
+To support the PKCE flow with server-side verification, the Magic Link email template must be modified in the Supabase Dashboard (`Authentication` > `Email Templates` > `Magic Link`).
+
+**Subject:** Login to ChainBridge Client Portal
+
+**Body:**
+```html
+<h2>Magic Link</h2>
+
+<p>Follow this link to login:</p>
+<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Log In</a></p>
+```
+
+> **Note:** Ensure your Supabase Project `Site URL` is set to your application URL (e.g., `http://localhost:3000` for development). If using `emailRedirectTo` dynamically, you can replace `{{ .SiteURL }}/auth/confirm` with `{{ .RedirectTo }}`.
+
+### 1.5 User Flow
 
 1. **Initiate Login**
    - User navigates to `/portal/login`
@@ -120,13 +136,12 @@ Protected routes will use Next.js middleware to:
 - Auto-redirects on success
 - Error display if verification fails
 
-### 3.3 Portal Dashboard (`/portal`) - Placeholder
+### 3.4 Navigation Integration
 
-**Initial Implementation:**
-- Welcome message with user email
-- Sign out button
-- "Coming Soon" placeholder content
-- Consistent navigation with main site
+**Main Navbar:**
+- "Client Portal" button should link to `/portal`
+- If unauthenticated, middleware will redirect to `/portal/login`
+- Styling remains consistent with existing gold outline button
 
 ---
 
