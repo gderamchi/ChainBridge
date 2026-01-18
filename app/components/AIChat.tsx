@@ -72,6 +72,8 @@ export default function AIChat() {
     let currentContent = "";
     let currentEventId: string | null = null;
     let mappedConversationId = localConversationId;
+    let activeAgentMessageId: string | null = null;
+    let shouldStop = false;
 
     const flushEvent = (rawData: string) => {
       const trimmed = rawData.trim();
@@ -119,13 +121,34 @@ export default function AIChat() {
           break;
         }
         case "generation_tokens": {
+          if (typeof payload?.messageId === "string") {
+            activeAgentMessageId = payload.messageId;
+          }
           if (typeof payload?.text === "string") {
             currentContent += payload.text;
             setStreamingContent(currentContent);
           }
           break;
         }
+        // Back-compat for older proxies.
+        case "tokens": {
+          if (typeof payload?.messageId === "string") {
+            activeAgentMessageId = payload.messageId;
+          }
+          if (typeof payload?.content === "string") {
+            currentContent += payload.content;
+            setStreamingContent(currentContent);
+          }
+          break;
+        }
         case "agent_message_success": {
+          if (
+            activeAgentMessageId &&
+            typeof payload?.messageId === "string" &&
+            payload.messageId !== activeAgentMessageId
+          ) {
+            break;
+          }
           const content =
             typeof payload?.message?.content === "string"
               ? payload.message.content
@@ -136,34 +159,54 @@ export default function AIChat() {
               ? payload.messageId
               : `msg-${Date.now()}`;
 
-          if (!mappedConversationId.startsWith("local-")) {
-            actions.addMessage(
-              mappedConversationId,
-              createChatMessage({
-                sId: messageId,
-                type: "agent_message",
-                content,
-              }),
-            );
-          }
+          actions.addMessage(
+            mappedConversationId,
+            createChatMessage({
+              sId: messageId,
+              type: "agent_message",
+              content,
+            }),
+          );
           setStreamingContent("");
           currentContent = "";
+          shouldStop = true;
+          break;
+        }
+        // Back-compat for older proxies.
+        case "done": {
+          const content =
+            typeof payload?.content === "string" ? payload.content : currentContent;
+          const messageId =
+            typeof payload?.messageId === "string"
+              ? payload.messageId
+              : `msg-${Date.now()}`;
+
+          actions.addMessage(
+            mappedConversationId,
+            createChatMessage({
+              sId: messageId,
+              type: "agent_message",
+              content,
+            }),
+          );
+          setStreamingContent("");
+          currentContent = "";
+          shouldStop = true;
           break;
         }
         case "agent_error": {
           const err = payload?.error?.message || "Unknown error";
-          if (!mappedConversationId.startsWith("local-")) {
-            actions.addMessage(
-              mappedConversationId,
-              createChatMessage({
-                sId: `error-${Date.now()}`,
-                type: "agent_message",
-                content: `Error: ${err}`,
-              }),
-            );
-          }
+          actions.addMessage(
+            mappedConversationId,
+            createChatMessage({
+              sId: `error-${Date.now()}`,
+              type: "agent_message",
+              content: `Error: ${err}`,
+            }),
+          );
           setStreamingContent("");
           currentContent = "";
+          shouldStop = true;
           break;
         }
       }
@@ -199,6 +242,15 @@ export default function AIChat() {
 
         const data = dataLines.join("\n");
         flushEvent(data);
+
+        if (shouldStop) {
+          try {
+            await reader.cancel();
+          } catch {
+            // ignore
+          }
+          return;
+        }
       }
     }
   };
