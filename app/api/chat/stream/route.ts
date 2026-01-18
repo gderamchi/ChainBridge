@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Api } from "@/src/sdk/dustApi";
 import type { Message, Conversation } from "@/src/sdk/dustApi";
 import { z } from "zod";
+import type { AxiosError } from "axios";
 
 const { DUST_WORKSPACE_ID, DUST_API_KEY, DUST_AGENT_ID } = process.env;
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { message, conversationId } = parseResult.data;
-  let cid: string | null = conversationId;
+  let cid: string | null = conversationId; // conversationId has to exist no matter what, if not we return an error
   const dustApi = new Api({
     baseURL: "https://dust.tt",
     headers: {
@@ -47,13 +48,41 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // If conversationId is null, we try and create one then set cid variable
   if (!cid) {
-    const conversationCreateResponse = await dustApi.api.v1WAssistantConversationsCreate(process.env.DUST_WORKSPACE_ID!, {
-      message: {
-        content: message,
-        mentions: []
+    let conversationCreateResponse;
+    try {
+      conversationCreateResponse = await dustApi.api.v1WAssistantConversationsCreate(process.env.DUST_WORKSPACE_ID!, {
+        message: {
+          content: message,
+          context: {
+            username: "user",
+            timezone: "UTC"
+          },
+          mentions: [
+            {
+              configurationId: process.env.DUST_AGENT_ID
+            }
+          ]
+        }
+      });
+    } catch (error) {
+      // Axios error handling
+      if (error && typeof error === "object" && "isAxiosError" in error && error.isAxiosError) {
+        const axiosError = error as AxiosError;
+        console.error("Axios error:", axiosError.message, axiosError.response?.data);
+        return NextResponse.json(
+          { error: axiosError.message, details: axiosError.response?.data },
+          { status: axiosError.response?.status || 500 }
+        );
+      } else {
+        console.error("Unknown error:", error);
+        return NextResponse.json(
+          { error: "Unknown error occurred" },
+          { status: 500 }
+        );
       }
-    });
+    }
     if (conversationCreateResponse.status !== 200 || !conversationCreateResponse.data.conversation?.created) {
       const errorMsg = conversationCreateResponse.statusText || "Internal Server Error";
       return NextResponse.json(
@@ -62,7 +91,7 @@ export async function POST(req: NextRequest) {
       );
     }
   }
-
+  console.log("_CONV_ID_", cid);
   console.log("__RES", parseResult.data);
   return NextResponse.json({});
   // return NextResponse.json(
