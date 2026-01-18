@@ -15,12 +15,12 @@
 - [x] Handle error states (missing/invalid authorization_id)
 
 ## Phase 3: Decision API Route
-- [ ] Create `/api/oauth/decision` route
-  - [ ] Handle POST form submission
-  - [ ] Call `approveAuthorization()` on approve
-  - [ ] Call `denyAuthorization()` on deny
-  - [ ] Redirect to `data.redirect_to`
-- [ ] Handle API errors
+- [X] Create `/api/oauth/decision` route
+  - [X] Handle POST form submission
+  - [X] Call `approveAuthorization()` on approve
+  - [X] Call `denyAuthorization()` on deny
+  - [X] Redirect to `data.redirect_to`
+- [X] Handle API errors
 
 ## Phase 4: Login Redirect Integration
 - [ ] Update `/portal/login` to accept `redirect` query param
