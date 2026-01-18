@@ -54,6 +54,7 @@ export default function AIChat() {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
       let currentContent = "";
 
       if (reader) {
@@ -61,17 +62,20 @@ export default function AIChat() {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split("\n");
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
 
           for (const line of lines) {
-            if (line.startsWith("data: ")) {
+            const trimmedLine = line.trim();
+            if (trimmedLine.startsWith("data: ")) {
               try {
-                const data = JSON.parse(line.slice(6));
+                const data = JSON.parse(trimmedLine.slice(6));
 
                 switch (data.type) {
                   case "tokens":
-                    currentContent = data.fullAnswer;
+                    currentContent += data.content;
                     setStreamingContent(currentContent);
                     break;
                   case "done": {
