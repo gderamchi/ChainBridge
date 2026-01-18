@@ -1,18 +1,28 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
-
-type ChatMessage = {
-  sId: string;
-  type: "user_message" | "agent_message";
-  content: string;
-};
+import {
+  createChatMessage,
+  createLocalConversationId,
+  useChat,
+} from "@/app/contexts/chat-context";
 
 export default function AIChat() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const {
+    conversations,
+    selectedConversationId,
+    selectedConversation,
+    actions,
+  } = useChat();
+
+  const conversationId = selectedConversationId;
+  const messages = useMemo(
+    () => selectedConversation?.messages ?? [],
+    [selectedConversation],
+  );
+
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const [streamingContent, setStreamingContent] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -21,17 +31,193 @@ export default function AIChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingContent]);
 
+  // Ensure there's always a selected conversation slot to write to.
+  useEffect(() => {
+    if (conversationId) return;
+    if (Object.keys(conversations).length > 0) return;
+
+    const localId = createLocalConversationId();
+    actions.upsertConversation({
+      conversationId: localId,
+      messages: [],
+      updatedAt: Date.now(),
+    });
+    actions.selectConversation(localId);
+  }, [actions, conversationId, conversations]);
+
+  const ensureSelectedConversation = () => {
+    if (conversationId) return conversationId;
+    const localId = createLocalConversationId();
+    actions.upsertConversation({
+      conversationId: localId,
+      messages: [],
+      updatedAt: Date.now(),
+    });
+    actions.selectConversation(localId);
+    return localId;
+  };
+
+  const resolveDustConversationId = () => {
+    if (!conversationId) return null;
+    if (conversationId.startsWith("local-")) return null;
+    return conversationId;
+  };
+
+  const handleSSE = async (response: Response, localConversationId: string) => {
+    const reader = response.body?.getReader();
+    if (!reader) return;
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentContent = "";
+    let currentEventId: string | null = null;
+    let mappedConversationId = localConversationId;
+
+    const flushEvent = (rawData: string) => {
+      const trimmed = rawData.trim();
+      if (!trimmed) return;
+
+      let payload: any;
+      try {
+        payload = JSON.parse(trimmed);
+      } catch {
+        return;
+      }
+
+      // Track lastEventId (either SSE id or embedded id).
+      const lastEventId =
+        typeof payload?.id === "string" ? payload.id : currentEventId;
+      if (lastEventId && !mappedConversationId.startsWith("local-")) {
+        actions.setLastEventId(mappedConversationId, lastEventId);
+      }
+
+      // Custom event injected by our API route.
+      if (payload?.type === "conversation_id" && payload?.conversationId) {
+        const dustId = String(payload.conversationId);
+
+        // Migrate local conversation state to the Dust conversationId.
+        const existing = conversations[localConversationId];
+        actions.upsertConversation({
+          conversationId: dustId,
+          title: existing?.title,
+          messages: existing?.messages ?? [],
+          updatedAt: Date.now(),
+        });
+        actions.deleteConversation(localConversationId);
+        actions.selectConversation(dustId);
+        mappedConversationId = dustId;
+        return;
+      }
+
+      // Dust SSE events (see https://docs.dust.tt/reference/events.md)
+      switch (payload?.type) {
+        case "conversation_title": {
+          if (mappedConversationId.startsWith("local-")) break;
+          if (typeof payload?.title === "string") {
+            actions.setTitle(mappedConversationId, payload.title);
+          }
+          break;
+        }
+        case "generation_tokens": {
+          if (typeof payload?.text === "string") {
+            currentContent += payload.text;
+            setStreamingContent(currentContent);
+          }
+          break;
+        }
+        case "agent_message_success": {
+          const content =
+            typeof payload?.message?.content === "string"
+              ? payload.message.content
+              : currentContent;
+
+          const messageId =
+            typeof payload?.messageId === "string"
+              ? payload.messageId
+              : `msg-${Date.now()}`;
+
+          if (!mappedConversationId.startsWith("local-")) {
+            actions.addMessage(
+              mappedConversationId,
+              createChatMessage({
+                sId: messageId,
+                type: "agent_message",
+                content,
+              }),
+            );
+          }
+          setStreamingContent("");
+          currentContent = "";
+          break;
+        }
+        case "agent_error": {
+          const err = payload?.error?.message || "Unknown error";
+          if (!mappedConversationId.startsWith("local-")) {
+            actions.addMessage(
+              mappedConversationId,
+              createChatMessage({
+                sId: `error-${Date.now()}`,
+                type: "agent_message",
+                content: `Error: ${err}`,
+              }),
+            );
+          }
+          setStreamingContent("");
+          currentContent = "";
+          break;
+        }
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+
+      // SSE frames are separated by a blank line.
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() ?? "";
+
+      for (const part of parts) {
+        const lines = part.split("\n");
+        currentEventId = null;
+        let dataLines: string[] = [];
+
+        for (const line of lines) {
+          const trimmedLine = line.trimEnd();
+          if (trimmedLine.startsWith("id:")) {
+            currentEventId = trimmedLine.slice(3).trim();
+            continue;
+          }
+          if (trimmedLine.startsWith("data:")) {
+            dataLines.push(trimmedLine.slice(5).trimStart());
+            continue;
+          }
+        }
+
+        const data = dataLines.join("\n");
+        flushEvent(data);
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessage: ChatMessage = {
+    const activeConversationId = ensureSelectedConversation();
+    const dustConversationId = resolveDustConversationId();
+
+    const userMessage = createChatMessage({
       sId: `temp-${Date.now()}`,
       type: "user_message",
       content: input.trim(),
-    };
+    });
 
-    setMessages((prev) => [...prev, userMessage]);
+    // For local conversation placeholder, we still append in-place.
+    actions.addMessage(activeConversationId, userMessage);
     setInput("");
     setIsLoading(true);
     setStreamingContent("");
@@ -44,7 +230,11 @@ export default function AIChat() {
         },
         body: JSON.stringify({
           message: userMessage.content,
-          conversationId,
+          conversationId: dustConversationId,
+          lastEventId:
+            dustConversationId
+              ? conversations[dustConversationId]?.lastEventId
+              : undefined,
         }),
       });
 
@@ -52,81 +242,30 @@ export default function AIChat() {
         throw new Error("Failed to send message");
       }
 
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let currentContent = "";
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          console.log("!chunk", chunk);
-          // buffer += chunk;
-          // const lines = buffer.split("\n");
-          // buffer = lines.pop() || "";
-
-          // for (const line of lines) {
-          //   const trimmedLine = line.trim();
-          //   if (trimmedLine.startsWith("data: ")) {
-          //     try {
-          //       const data = JSON.parse(trimmedLine.slice(6));
-
-          //       switch (data.type) {
-          //         case "tokens":
-          //           currentContent += data.content;
-          //           setStreamingContent(currentContent);
-          //           break;
-          //         case "done": {
-          //           if (!conversationId) {
-          //             setConversationId(data.conversationId);
-          //           }
-          //           const assistantMessage: ChatMessage = {
-          //             sId: data.messageId || `msg-${Date.now()}`,
-          //             type: "agent_message",
-          //             content: data.content || currentContent,
-          //           };
-          //           setMessages((prev) => [...prev, assistantMessage]);
-          //           setStreamingContent("");
-          //           break;
-          //         }
-          //         case "error": {
-          //           console.error("Stream error:", data.error);
-          //           const errorMessage: ChatMessage = {
-          //             sId: `error-${Date.now()}`,
-          //             type: "agent_message",
-          //             content: `Error: ${data.error}`,
-          //           };
-          //           setMessages((prev) => [...prev, errorMessage]);
-          //           setStreamingContent("");
-          //           break;
-          //         }
-          //       }
-          //     } catch {
-          //       // Ignore parse errors for incomplete JSON
-          //     }
-          //   }
-          // }
-        }
-      }
+      await handleSSE(response, activeConversationId);
     } catch (error) {
       console.error("Error sending message:", error);
-      const errorMessage: ChatMessage = {
-        sId: `error-${Date.now()}`,
-        type: "agent_message",
-        content: "Sorry, there was an error processing your request.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      actions.addMessage(
+        ensureSelectedConversation(),
+        createChatMessage({
+          sId: `error-${Date.now()}`,
+          type: "agent_message",
+          content: "Sorry, there was an error processing your request.",
+        }),
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleNewChat = () => {
-    setMessages([]);
-    setConversationId(null);
+    const localId = createLocalConversationId();
+    actions.upsertConversation({
+      conversationId: localId,
+      messages: [],
+      updatedAt: Date.now(),
+    });
+    actions.selectConversation(localId);
     setStreamingContent("");
   };
 
