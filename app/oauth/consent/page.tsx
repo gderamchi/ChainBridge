@@ -30,18 +30,8 @@ export default async function ConsentPage({ searchParams }: ConsentPageProps) {
     redirect(`/portal/login?redirect=/oauth/consent?authorization_id=${authorizationId}`);
   }
 
-  // Get authorization details
-  const { data: authDetails, error } =
-    await supabase.auth.oauth.getAuthorizationDetails(authorizationId);
-
-  if (error || !authDetails) {
-    return (
-      <ErrorDisplay
-        title="Authorization Error"
-        message={error?.message || "Invalid or expired authorization request."}
-      />
-    );
-  }
+  // Note: We don't call getAuthorizationDetails() here because it consumes the authorization.
+  // The authorization will be processed when the user clicks Approve or Deny.
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-dark relative overflow-hidden p-6">
@@ -66,46 +56,15 @@ export default async function ConsentPage({ searchParams }: ConsentPageProps) {
           Authorize Application
         </h1>
         <p className="text-text-muted text-center mb-6 font-light text-sm">
-          <span className="text-gold-primary font-medium">{authDetails.client.name}</span> is requesting access to your account
+          An application is requesting access to your ChainBridge account
         </p>
 
-        {/* Client Info */}
+        {/* Info Notice */}
         <div className="w-full bg-white/5 border border-white/10 p-4 mb-6">
-          <div className="flex flex-col gap-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-text-muted">Application</span>
-              <span className="text-white font-medium">{authDetails.client.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-text-muted">Redirect URI</span>
-              <span className="text-white/70 text-xs truncate max-w-[200px]">
-                {authDetails.redirect_url}
-              </span>
-            </div>
-          </div>
+          <p className="text-sm text-text-muted">
+            By clicking <span className="text-white">Approve</span>, you authorize this application to access your account on your behalf.
+          </p>
         </div>
-
-        {/* Scopes */}
-        {authDetails.scope && authDetails.scope.length > 0 && (
-          <div className="w-full mb-6">
-            <p className="text-text-muted text-xs uppercase tracking-wider mb-3">
-              Requested Permissions
-            </p>
-            <ul className="space-y-2">
-              {authDetails.scope.split(" ").map((s: string) => (
-                <li
-                  key={s}
-                  className="flex items-center gap-2 text-sm text-white/80"
-                >
-                  <span className="material-symbols-outlined text-gold-primary text-base">
-                    check_circle
-                  </span>
-                  {formatScope(s)}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         {/* Decision Form */}
         <ConsentForm authorizationId={authorizationId} />
