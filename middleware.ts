@@ -1,7 +1,22 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Placeholder for future rate limiting logic.
+// This function can be expanded to use Redis or another store.
+async function checkRateLimit(request: NextRequest): Promise<boolean> {
+  // Currently allows all requests.
+  return true;
+}
+
 export async function middleware(request: NextRequest) {
+  // 1. Rate Limiting Check for API routes
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    const isAllowed = await checkRateLimit(request);
+    if (!isAllowed) {
+      return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 });
+    }
+  }
+
   // Create response to modify
   let response = NextResponse.next({
     request: { headers: request.headers },
