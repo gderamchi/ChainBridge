@@ -155,8 +155,10 @@ const ChatBotDemo = () => {
                           <ReasoningContent>{part.text}</ReasoningContent>
                         </Reasoning>
                       );
-                    default:
-                      return null;
+                    default: {
+                      return <div key={`${message.id}-${i}`}>{JSON.stringify(part, null, 2)}</div>
+                    }
+                      
                   }
                 })}
               </div>
@@ -193,4 +195,5 @@ const ChatBotDemo = () => {
     </div>
   );
 };
+
 export default ChatBotDemo;
