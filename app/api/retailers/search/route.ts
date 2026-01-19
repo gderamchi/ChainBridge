@@ -5,15 +5,15 @@ import { SearchRetailersSchema } from './schema';
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
 
-  // 1. Authentication Check
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  // // 1. Authentication Check
+  // const {
+  //   data: { user },
+  //   error: authError,
+  // } = await supabase.auth.getUser();
 
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // if (authError || !user) {
+  //   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // }
 
   // 2. Validate Query Parameters
   const { searchParams } = new URL(request.url);
