@@ -1,0 +1,13 @@
+{
+    "terminal.integrated.profiles.linux": {
+        "zsh (host)": {
+            "path": "/usr/bin/flatpak-spawn",
+            "args": [
+                "--host",
+                "zsh"
+            ],
+            "icon": "terminal-bash"
+        }
+    },
+    "terminal.integrated.defaultProfile.linux": "zsh (host)"
+}

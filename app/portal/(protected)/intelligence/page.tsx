@@ -1,4 +1,4 @@
-// import AIChat from "@/app/components/AIChat";
+import AIChat from "@/app/components/AIChat";
 
 export default function IntelligencePage() {
   return (
@@ -10,8 +10,8 @@ export default function IntelligencePage() {
         </p>
       </div>
 
-      <div className="flex-1 min-h-0 mt-6 bg-white/5 border border-white/10 rounded-sm overflow-hidden">
-        {/* <AIChat /> */}
+      <div className="flex-1 min-h-0 mt-6 bg-white/5 border border-white/10 rounded-sm overflow-hidden flex flex-col">
+        <AIChat />
       </div>
     </div>
   );
