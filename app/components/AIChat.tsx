@@ -42,13 +42,11 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '@/components/ai-elements/sources';
-import {
-  Reasoning,
-  ReasoningContent,
-  ReasoningTrigger,
-} from '@/components/ai-elements/reasoning';
+import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Loader } from '@/components/ai-elements/loader';
 import { DefaultChatTransport } from 'ai';
+import RetailerCard from '@/components/RetailerCard';
+import { Retailer } from '@/scripts/data/types/retailer';
 
 const models = [
   {
@@ -144,6 +142,23 @@ const ChatBotDemo = () => {
                           )}
                         </Message>
                       );
+                    case 'file': {
+                      if (part.mediaType && part.mediaType.startsWith('image/')) {
+                        return (
+                          <Message key={`${message.id}-${i}`} from={message.role}>
+                            <MessageContent>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={part.url}
+                                alt="User uploaded image"
+                                className="max-w-full rounded-md"
+                              />
+                            </MessageContent>
+                          </Message>
+                        );
+                      }
+                      return null;
+                    }
                     case 'reasoning':
                       return (
                         <Reasoning
@@ -156,7 +171,22 @@ const ChatBotDemo = () => {
                         </Reasoning>
                       );
                     default: {
-                      return <div key={`${message.id}-${i}`}>{JSON.stringify(part, null, 2)}</div>
+                      if (part.type == "tool-searchRetailers") {
+                        const output = part.output as {data: Retailer[]} | undefined;
+                        if (output)
+                        // console.log("__DATA__", output);
+                         return (
+                          <div key={`${message.id}-${i}`} className="flex flex-col gap-4 w-full">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {(output.data).map((retailer: Retailer, ) => (
+                                <RetailerCard key={(retailer as any)["id"]} retailer={retailer} />
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      } else
+                        return null;
+                      // return <div key={`${message.id}-${i}`}>{JSON.stringify(part, null, 2)}</div>
                     }
                       
                   }

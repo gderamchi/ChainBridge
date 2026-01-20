@@ -24,30 +24,37 @@ import productGroups from '@/scripts/data/productGroups.json';
 export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json();
 
-  const mcpClient = await createMCPClient({
-    transport: {
-      type: 'http',
-      url: 'http://localhost:3000/mcp',
+  // const mcpClient = await createMCPClient({
+  //   transport: {
+  //     type: 'http',
+  //     url: 'http://localhost:3000/mcp',
 
-      // optional: configure HTTP headers
-      // headers: { Authorization: 'Bearer my-api-key' },
+  //     // optional: configure HTTP headers
+  //     // headers: { Authorization: 'Bearer my-api-key' },
 
-      // optional: provide an OAuth client provider for automatic authorization
-      // authProvider: myOAuthClientProvider,
-    },
-  });
-  const mcpTools = await mcpClient.tools();
+  //     // optional: provide an OAuth client provider for automatic authorization
+  //     // authProvider: myOAuthClientProvider,
+  //   },
+  // });
+  // const mcpTools = await mcpClient.tools();
 
   const origin = new URL(req.url).origin;
 
   const result = streamText({
     model: "google/gemini-2.5-flash-lite",
-    system: `You are a helpful assistant that helps the user find the right retailer. For now, only clothing materials are available. The user can describe what kind of clothes they want to be manufactured, and you should use the searchRetailers tool by sending the right product group detected.
+    system: `You are a super friendly and convivial assistant here to help the user find the perfect manufacturing retailer! 🌟 Your goal is to understand their needs and match them with the right partner.
+
+Currently, we specialize in **clothing materials**. When the user describes what they want to manufacture, enthusiastically affirm their choice! ✨ Then, identify the best fitting product group from the list below and use the \`searchRetailers\` tool.
 
 Here is the list of available product groups you can choose from:
 ${JSON.stringify(productGroups, null, 2)}
-You will search the retailers with the product group that fits what the user need. If the question is off topic or what the user need is not covered by the product group, inform the user.
-You have to inform the user of what you are doing at every steps, before calling and after calling a tool you have to communicate with the user.
+
+**Your Guidelines:**
+1.  **Be Convivial & Affirmative:** Always keep the tone warm, encouraging, and helpful. Use emojis to make the conversation lively! 🚀
+2.  **Search Logic:** Use the \`searchRetailers\` tool by sending the detected product group.
+3.  **Pre-Tool Communication:** Always inform the user of what you are doing *before* calling a tool (e.g., "That sounds like a great project! Let me look for retailers that specialize in that... 🕵️‍♀️").
+4.  **Post-Tool Communication:** After getting results, provide a **concise summary** of what you found. Then, ask if they need further assistance with this request (e.g., "Do any of these look good to you, or shall we refine the search? 🤔").
+5.  **Handling Misses:** If the request is off-topic or the product group isn't available, kindly let them know (e.g., "I'd love to help, but we don't have that category yet 🥺") and guide them back to what is available.
 `,
     // system: "You are a magic eight balls game, when the user ask to shake, you call the tool",
     messages: await convertToModelMessages(messages),

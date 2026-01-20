@@ -30,7 +30,7 @@ async function insertData() {
     for (let i = 0; i < retailers.length; i += BATCH_SIZE) {
       const batch = retailers.slice(i, i + BATCH_SIZE);
       const currentBatchNum = Math.floor(i / BATCH_SIZE) + 1;
-
+    
       // Map to snake_case strictly matching DB schema
       const preparedData = batch.map(r => ({
         english_name: r.englishName,
@@ -41,17 +41,19 @@ async function insertData() {
         exhibition: r.exhibition
       }));
 
-      const { error } = await supabase.from('retailers').insert(preparedData);
+      console.log(JSON.stringify(preparedData, null, 2))
 
-      if (error) {
-        console.error(`Error inserting batch ${currentBatchNum}/${totalBatches}:`, error);
-        // Optionally break or continue based on severity. 
-        // For a large script, typically you might want to log failed batches and continue, or stop.
-        // I'll stop here to be safe and let user investigate.
-        process.exit(1);
-      } else {
-        console.log(`Success: Batch ${currentBatchNum}/${totalBatches} inserted (${batch.length} records).`);
-      }
+      // const { error } = await supabase.from('retailers').insert(preparedData);
+
+      // if (error) {
+      //   console.error(`Error inserting batch ${currentBatchNum}/${totalBatches}:`, error);
+      //   // Optionally break or continue based on severity. 
+      //   // For a large script, typically you might want to log failed batches and continue, or stop.
+      //   // I'll stop here to be safe and let user investigate.
+      //   process.exit(1);
+      // } else {
+      //   console.log(`Success: Batch ${currentBatchNum}/${totalBatches} inserted (${batch.length} records).`);
+      // }
     }
 
     console.log('All data inserted successfully.');

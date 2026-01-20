@@ -36,13 +36,22 @@ export async function GET(request: NextRequest) {
 
   // 3. Database Query
   const adminSupabase = await createClient(process.env.SUPABASE_SECRET_KEY);
-  const { data: retailers, error: dbError } = await adminSupabase
-    .from('retailers')
-    .select('*')
-    // We use the arrow operator ->> to get the value as text for comparison
-    // Matches logic: category->>'product' == productGroup
-    .eq('category->>product', productGroup)
-    .range(from, to);
+
+  let query = adminSupabase.from('retailers').select('*');
+  
+  if (productGroup) {
+      const terms = productGroup.split(/\s+/).filter(Boolean);
+      if (terms.length > 0) {
+        // Construct an OR filter for each term using ILIKE
+        // category->>product ilike %term1% OR category->>product ilike %term2% ...
+        const orFilter = terms
+          .map(term => `category->>product.ilike.%${term}%`)
+          .join(',');
+        query = query.or(orFilter);
+      }
+  }
+  
+  const { data: retailers, error: dbError } = await query.range(from, to);
 
   if (dbError) {
     console.error('Database error:', dbError);
