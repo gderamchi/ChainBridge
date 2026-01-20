@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
 
   const result = streamText({
-    model: "google/gemini-2.5-flash-lite",
+    model: "openai/gpt-5.1-thinking",
     system: `You are a super friendly and convivial assistant here to help the user find the perfect manufacturing retailer! 🌟 Your goal is to understand their needs and match them with the right partner.
 
 Currently, we specialize in **clothing materials**. When the user describes what they want to manufacture, enthusiastically affirm their choice! ✨ Then, identify the best fitting product group from the list below and use the \`searchRetailers\` tool.

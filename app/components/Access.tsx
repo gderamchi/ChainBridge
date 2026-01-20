@@ -17,9 +17,6 @@ export default function Access() {
           <button className="flex min-w-[200px] cursor-pointer items-center justify-center h-14 px-10 bg-gold-primary text-slate-900 hover:bg-white transition-all duration-300 text-sm font-bold uppercase tracking-widest shadow-[0_0_20px_rgba(197,160,89,0.2)]">
             Begin Application
           </button>
-          <button className="flex min-w-[200px] cursor-pointer items-center justify-center h-14 px-10 bg-transparent border border-white/10 hover:border-gold-primary text-white hover:text-gold-primary transition-all duration-300 text-sm font-bold uppercase tracking-widest">
-            Speak to Concierge
-          </button>
         </div>
       </div>
     </section>
