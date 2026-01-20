@@ -1,5 +1,5 @@
 {
-  "exportedAt": "2026-01-17T18:23:36.765Z",
+  "exportedAt": "2026-01-20T08:56:12.276Z",
   "exhibition": {
     "name": "Intertextile",
     "address": "168 East Yinggang Road, Shanghai, China"
@@ -7307,7 +7307,9 @@
         "product": "Others"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "sldwsc@sld978.com.cn"
+      },
       "exhibition": [
         {
           "name": "Intertextile",
@@ -11132,7 +11134,9 @@
         "product": "Man-made"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "hzlongbo@sina.com"
+      },
       "exhibition": [
         {
           "name": "Intertextile",
@@ -11319,7 +11323,9 @@
         "product": "Knitted"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "jeanne-wang@ruilitex.com"
+      },
       "exhibition": [
         {
           "name": "Intertextile",
@@ -13750,7 +13756,9 @@
         "product": "Silk"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "jjlsilk@163.com"
+      },
       "exhibition": [
         {
           "name": "Intertextile",
@@ -23525,7 +23533,9 @@
         "product": "Shoulder Pads"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "shenjianfan@126.com"
+      },
       "exhibition": [
         {
           "name": "Intertextile",
@@ -29628,7 +29638,9 @@
         "product": "Cotton"
       },
       "country": "China",
-      "contact": {},
+      "contact": {
+        "email": "tina@shaoxingkerry.com"
+      },
       "exhibition": [
         {
           "name": "Intertextile",

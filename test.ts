@@ -68,7 +68,7 @@ function parseSheet(sheet: any): Retailer[] {
     // Column 3: Product Category
     // Column 4: Hall/Booth Area
     // Column 5: Booth Number
-    // Column 6: Unknown
+    // Column 6: Email
     // Column 7: Country/Region
     
     // Process header row if it contains actual data
@@ -77,6 +77,7 @@ function parseSheet(sheet: any): Retailer[] {
         const chineseName = headers[1]?.trim();
         const productCategory = headers[2]?.trim();
         const boothNumber = headers[4]?.trim();
+        const email = headers[5]?.trim();
         const country = headers[6]?.trim() || 'China';
         
         if (englishName && productCategory) {
@@ -88,7 +89,9 @@ function parseSheet(sheet: any): Retailer[] {
                     product: normalizeProduct(productCategory)
                 },
                 country: country,
-                contact: {},
+                contact: {
+                    email: email && email.includes('@') ? email : undefined
+                },
                 exhibition: [{
                     name: exhibition.name,
                     address: exhibition.address,
@@ -110,6 +113,7 @@ function parseSheet(sheet: any): Retailer[] {
             const chineseName = (row.Column_2 || row[headers[1]])?.trim();
             const productCategory = (row.Column_3 || row[headers[2]])?.trim();
             const boothNumber = (row.Column_5 || row[headers[4]])?.trim();
+            const email = (row.Column_6 || row[headers[5]])?.trim();
             const country = (row.Column_7 || row[headers[6]])?.trim() || 'China';
             
             if (englishName && productCategory) {
@@ -121,7 +125,9 @@ function parseSheet(sheet: any): Retailer[] {
                         product: normalizeProduct(productCategory)
                     },
                     country: country,
-                    contact: {},
+                    contact: {
+                        email: email && email.includes('@') ? email : undefined
+                    },
                     exhibition: [{
                         name: exhibition.name,
                         address: exhibition.address,
