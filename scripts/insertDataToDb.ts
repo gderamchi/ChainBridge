@@ -20,8 +20,14 @@ async function insertData() {
   try {
     console.log(`Reading data from ${filePath}...`);
     const rawData = fs.readFileSync(filePath, 'utf-8');
-    const retailers: Retailer[] = JSON.parse(rawData);
+    const parsedData = JSON.parse(rawData);
+    // Handle both array format (legacy) and new object format containing 'retailers' key
+    const retailers: Retailer[] = Array.isArray(parsedData) ? parsedData : parsedData.retailers;
     
+    if (!retailers) {
+        throw new Error("Could not find retailers array in the JSON file");
+    }
+
     console.log(`Total records to insert: ${retailers.length}`);
 
     const BATCH_SIZE = 500;
@@ -43,17 +49,17 @@ async function insertData() {
 
       console.log(JSON.stringify(preparedData, null, 2))
 
-      // const { error } = await supabase.from('retailers').insert(preparedData);
+      const { error } = await supabase.from('retailers').insert(preparedData);
 
-      // if (error) {
-      //   console.error(`Error inserting batch ${currentBatchNum}/${totalBatches}:`, error);
-      //   // Optionally break or continue based on severity. 
-      //   // For a large script, typically you might want to log failed batches and continue, or stop.
-      //   // I'll stop here to be safe and let user investigate.
-      //   process.exit(1);
-      // } else {
-      //   console.log(`Success: Batch ${currentBatchNum}/${totalBatches} inserted (${batch.length} records).`);
-      // }
+      if (error) {
+        console.error(`Error inserting batch ${currentBatchNum}/${totalBatches}:`, error);
+        // Optionally break or continue based on severity. 
+        // For a large script, typically you might want to log failed batches and continue, or stop.
+        // I'll stop here to be safe and let user investigate.
+        process.exit(1);
+      } else {
+        console.log(`Success: Batch ${currentBatchNum}/${totalBatches} inserted (${batch.length} records).`);
+      }
     }
 
     console.log('All data inserted successfully.');
